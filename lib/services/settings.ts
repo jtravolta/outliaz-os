@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
+import { getPrismaClient, type createPrismaClient } from "@/lib/db/prisma";
 import {
   auditLogs, businessTypes, industries, integrationCredentials, prospects, suppressions, users, workspaces,
 } from "@/lib/db/schema";
@@ -15,10 +16,30 @@ import {
 
 /* ── workspace ──────────────────────────────────────────────────────────── */
 
-export async function getWorkspace(ctx: Ctx) {
-  const [row] = await db.select().from(workspaces).where(eq(workspaces.id, ctx.user.workspaceId));
+export async function getWorkspace(
+  ctx: Ctx,
+  prisma: ReturnType<typeof createPrismaClient> = getPrismaClient(),
+) {
+  const row = await prisma.workspaces.findUnique({
+    where: { id: ctx.user.workspaceId },
+  });
   if (!row) throw fail("NOT_FOUND", "Workspace not found", 404);
-  return row;
+  return {
+    id: row.id,
+    name: row.name,
+    timezone: row.timezone,
+    sendWindowStart: row.send_window_start,
+    sendWindowEnd: row.send_window_end,
+    dailySendCap: row.daily_send_cap,
+    hourlySendCap: row.hourly_send_cap,
+    trackOpens: row.track_opens,
+    trackClicks: row.track_clicks,
+    unsubscribeFooter: row.unsubscribe_footer,
+    footerText: row.footer_text,
+    setupCompletedAt: row.setup_completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export async function updateWorkspace(ctx: Ctx, patch: Record<string, unknown>) {
