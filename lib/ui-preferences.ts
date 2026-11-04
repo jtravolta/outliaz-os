@@ -1,0 +1,2 @@
+// Executed in <head> before first paint; contains no private data or requests.
+export const preferenceScript = `(()=>{let p={theme:"dark",collapsed:false};try{const s=JSON.parse(localStorage.getItem("outliaz-ui-v1")||"null");if(s&&typeof s==="object"){p.theme=s.theme==="light"?"light":"dark";p.collapsed=s.collapsed===true}}catch{}const h=document.documentElement;h.classList.toggle("dark",p.theme==="dark");h.dataset.theme=p.theme;h.dataset.sidebar=p.collapsed?"collapsed":"expanded"})()`;

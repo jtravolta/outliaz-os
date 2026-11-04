@@ -5,6 +5,8 @@
 # Dependencies, build output and local database
 node_modules/
 .next/
+.next-ui/
+.next-ui-build/
 .pgdata/
 *.tsbuildinfo
 next-env.d.ts

@@ -1,235 +1,328 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import {
-  BarChart3, Bell, BookOpen, Inbox, LayoutDashboard, Menu, PlayCircle, Radar, Search,
-  Settings, Target, Workflow, X,
-} from "lucide-react";
 import { usePathname } from "next/navigation";
-import type { NotificationItem, ShellUser } from "@/components/nav-meta";
-import { NAV, SETTINGS_NAV, titleFor } from "@/components/nav-meta";
+import { useState, type ReactNode } from "react";
+import {
+  Bell,
+  Ellipsis,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+} from "lucide-react";
+import {
+  NAV,
+  SECONDARY_NAV,
+  SETTINGS_NAV,
+  titleFor,
+  type NotificationItem,
+  type ShellUser,
+} from "@/components/nav-meta";
+import { useShellPreferences } from "@/components/shell-preferences";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 type NavItem = (typeof NAV)[number];
-
-const NAV_ICONS: Record<string, typeof LayoutDashboard> = {
-  LayoutDashboard, Target, Radar, PlayCircle, Workflow, Inbox, BookOpen, BarChart3,
-};
 
 export function AppShell({
   user,
   notifications,
   children,
+  preview = false,
 }: {
   user: ShellUser;
   notifications: NotificationItem[];
-  children: React.ReactNode;
+  children: ReactNode;
+  preview?: boolean;
 }) {
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
-  const unread = notifications.filter((n) => !n.readAt).length;
+  const { theme, collapsed, toggleTheme, toggleSidebar } =
+    useShellPreferences();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const title = titleFor(pathname);
-
-  const nav = useMemo(() => NAV, []);
+  const unread = notifications.filter((item) => !item.readAt).length;
+  const themeLabel =
+    theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  const collapseLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  const mobileItems = [NAV[0], NAV[1], NAV[4]];
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 top-0 z-40 hidden w-56 flex-col border-r border-border bg-card md:flex">
-        <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Radar className="size-4" />
+    <div className="outliaz-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <aside
+        id="workspace-sidebar"
+        className="workspace-sidebar"
+        aria-label="Workspace sidebar"
+      >
+        <Link
+          href="/dashboard"
+          className="wordmark"
+          aria-label="outliaz Outliaz OS home"
+        >
+          <span className="wordmark-full" aria-hidden="true">
+            outliaz{" "}
           </span>
-          <span className="text-[15px] font-semibold tracking-tight">Outbound OS</span>
-          <span className="ml-auto rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground uppercase">local</span>
-        </div>
-        <nav className="flex-1 overflow-y-auto p-2">
+          <span className="wordmark-short" aria-hidden="true">
+            o
+          </span>
+          <span className="wordmark-caption" aria-hidden="true">
+            Outliaz OS
+          </span>
+        </Link>
+        <nav className="workspace-nav" aria-label="Main navigation">
           {NAV.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} onNavigate={() => setSidebarOpen(false)} />
+            <WorkspaceLink
+              key={item.href}
+              item={item}
+              pathname={preview ? "/dashboard" : pathname}
+              collapsed={collapsed}
+            />
           ))}
-          <Link
-            href={SETTINGS_NAV.href}
-            onClick={() => setSidebarOpen(false)}
-            className={`mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors hover:bg-muted ${pathname.startsWith("/settings") ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-          >
-            <SETTINGS_NAV.icon className="size-4" /> {SETTINGS_NAV.label}
-          </Link>
         </nav>
-        <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-foreground">
-              {user.name.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("")}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold">{user.name}</p>
-              <p className="truncate text-[11px] text-muted-foreground capitalize">{user.role}</p>
-            </div>
+        <nav className="secondary-nav" aria-label="More tools">
+          {SECONDARY_NAV.map((item) => (
+            <WorkspaceLink
+              key={item.href}
+              item={item}
+              pathname={pathname}
+              collapsed={collapsed}
+            />
+          ))}
+        </nav>
+        <footer className="sidebar-footer">
+          <div className="workspace-identity">
+            <span className="identity-name">{user.name}</span>
+            <span className="identity-scope">{user.workspaceName}</span>
           </div>
-        </div>
+          <WorkspaceLink
+            item={SETTINGS_NAV}
+            pathname={pathname}
+            collapsed={collapsed}
+          />
+        </footer>
       </aside>
 
-      {/* Mobile sidebar drawer */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/45" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-border bg-card shadow-2xl">
-            <div className="flex h-14 items-center justify-between border-b border-border px-4">
-              <span className="text-[15px] font-semibold tracking-tight">Outbound OS</span>
-              <button className="rounded-md p-1 text-muted-foreground hover:bg-muted" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
-                <X className="size-4" />
-              </button>
-            </div>
-            <nav className="flex-1 overflow-y-auto p-2">
-              {nav.map((item) => (
-                <MobileLink key={item.href} item={item} pathname={pathname} onNavigate={() => setSidebarOpen(false)} />
-              ))}
-            </nav>
-          </aside>
-        </div>
-      )}
-
-      <div className="flex min-h-screen flex-1 flex-col md:pl-56">
-        {/* Topbar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card/90 px-4 backdrop-blur md:px-6">
-          <button className="rounded-md p-2 text-muted-foreground hover:bg-muted md:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-            <Menu className="size-5" />
-          </button>
-          <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
-          <div className="ml-auto flex items-center gap-2">
-            <Link
-              href="/dashboard"
-              className="hidden items-center gap-1.5 rounded-lg border border-border px-3 h-8 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
-            >
-              <Search className="size-3.5" /> Search prospects…
-            </Link>
-            <div className="relative">
-              <button
-                onClick={() => setNotifOpen((v) => !v)}
-                className="relative rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted"
-                aria-label="Notifications"
+      <div className="workspace-frame">
+        <header className="workspace-topbar">
+          <div className="workspace-location">
+            <div className="desktop-control">
+              <IconAction
+                label={collapseLabel}
+                onClick={toggleSidebar}
+                aria-controls="workspace-sidebar"
+                aria-expanded={!collapsed}
               >
-                <Bell className="size-4" />
-                {unread > 0 && <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white">{unread}</span>}
-              </button>
-              {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
+                {collapsed ? (
+                  <PanelLeftOpen aria-hidden="true" />
+                ) : (
+                  <PanelLeftClose aria-hidden="true" />
+                )}
+              </IconAction>
             </div>
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 rounded-lg border border-border py-1.5 pl-1.5 pr-3 transition-colors hover:bg-muted"
-            >
-              <span className="flex size-6 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
-                {user.name.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("")}
-              </span>
-              <span className="hidden text-[13px] font-medium sm:block">{user.name}</span>
-              <Settings className="size-3.5 text-muted-foreground" />
-            </Link>
+            <span className="workspace-crumb">
+              Workspace <span aria-hidden="true">/</span> <span>{title}</span>
+            </span>
+          </div>
+          <div className="topbar-actions">
+            <span className="workspace-mode">
+              {preview ? "UI preview" : "Local workspace"}
+            </span>
+            <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        unread
+                          ? `Notifications, ${unread} unread`
+                          : "Notifications"
+                      }
+                    >
+                      <Bell aria-hidden="true" />
+                      {unread > 0 && (
+                        <span className="notification-dot" aria-hidden="true" />
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Notifications</TooltipContent>
+              </Tooltip>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Notifications</SheetTitle>
+                  <SheetDescription>
+                    {preview
+                      ? "No account data is connected to this preview."
+                      : "Updates from your workspace."}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="notification-list">
+                  {notifications.length === 0 ? (
+                    <p className="muted-copy">No notifications.</p>
+                  ) : (
+                    notifications.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={item.href ?? "/dashboard"}
+                        className="notification-item"
+                        onClick={() => setNotificationsOpen(false)}
+                      >
+                        <strong>{item.title}</strong>
+                        {item.body && <span>{item.body}</span>}
+                        {!item.readAt && (
+                          <span className="notification-unread">Unread</span>
+                        )}
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+            <IconAction label={themeLabel} onClick={toggleTheme}>
+              {theme === "dark" ? (
+                <Sun aria-hidden="true" />
+              ) : (
+                <Moon aria-hidden="true" />
+              )}
+            </IconAction>
           </div>
         </header>
-
-        <main className="flex-1 px-4 py-6 pb-24 md:px-6 md:pb-10">{children}</main>
+        <main id="main-content" className="workspace-content" tabIndex={-1}>
+          {children}
+        </main>
       </div>
 
-      {/* Mobile bottom tabs */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-stretch border-t border-border bg-card md:hidden">
-        {NAV.slice(0, 4).map((item) => (
-          <MobileTab key={item.href} item={item} pathname={pathname} />
-        ))}
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <nav className="mobile-navigation" aria-label="Mobile navigation">
+          {mobileItems.map((item) => {
+            const Icon = item.icon;
+            const active =
+              (preview && item.href === "/dashboard") ||
+              isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn("mobile-destination", active && "is-active")}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon aria-hidden="true" className="shell-icon" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <SheetTrigger asChild>
+            <button
+              className={cn("mobile-destination", moreOpen && "is-active")}
+              type="button"
+            >
+              <Ellipsis aria-hidden="true" className="shell-icon" />
+              <span>More</span>
+            </button>
+          </SheetTrigger>
+        </nav>
+        <SheetContent side="bottom">
+          <SheetHeader>
+            <SheetTitle>Workspace</SheetTitle>
+            <SheetDescription>
+              Tools and preferences for {user.name}.
+            </SheetDescription>
+          </SheetHeader>
+          <nav className="mobile-more-links" aria-label="More destinations">
+            {[
+              NAV[2],
+              NAV[3],
+              NAV[5],
+              NAV[6],
+              ...SECONDARY_NAV,
+              SETTINGS_NAV,
+            ].map((item) => (
+              <WorkspaceLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                collapsed={false}
+                onNavigate={() => setMoreOpen(false)}
+              />
+            ))}
+          </nav>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function WorkspaceLink({
+  item,
+  pathname,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  const Icon = item.icon;
+  const active = isActive(pathname, item.href);
+  return (
+    <Tooltip open={collapsed ? undefined : false}>
+      <TooltipTrigger asChild>
         <Link
-          href={SETTINGS_NAV.href}
-          className={`flex flex-1 items-center justify-center py-2.5 text-muted-foreground ${pathname.startsWith("/settings") ? "text-primary" : ""}`}
+          href={item.href}
+          onClick={onNavigate}
+          className={cn("workspace-nav-link", active && "is-active")}
+          aria-label={item.label}
+          aria-current={active ? "page" : undefined}
         >
-          <Settings className="size-5" />
+          <Icon aria-hidden="true" className="shell-icon" />
+          <span className="nav-label">{item.label}</span>
         </Link>
-      </nav>
-    </div>
+      </TooltipTrigger>
+      <TooltipContent side="right">{item.label}</TooltipContent>
+    </Tooltip>
   );
 }
 
-function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate: () => void }) {
-  const Icon = item.icon;
-  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+function IconAction({
+  label,
+  children,
+  ...props
+}: {
+  label: string;
+  children: ReactNode;
+} & Omit<React.ComponentProps<typeof Button>, "children">) {
   return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
-        active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-      }`}
-    >
-      <Icon className="size-4" /> {item.label}
-    </Link>
-  );
-}
-
-function MobileLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate: () => void }) {
-  const Icon = item.icon;
-  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium ${active ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-    >
-      <Icon className="size-4" /> {item.label}
-    </Link>
-  );
-}
-
-function MobileTab({ item, pathname }: { item: NavItem; pathname: string }) {
-  const Icon = item.icon;
-  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-  return (
-    <Link
-      href={item.href}
-      className={`flex flex-1 items-center justify-center py-2.5 ${active ? "text-primary" : "text-muted-foreground"}`}
-    >
-      <Icon className="size-5" />
-    </Link>
-  );
-}
-
-function NotificationPanel({ onClose }: { onClose: () => void }) {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let on = true;
-    fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!on) return;
-        setItems(data.notifications ?? []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-    return () => {
-      on = false;
-    };
-  }, []);
-
-  return (
-    <div className="absolute right-0 top-12 z-50 w-80 rounded-xl border border-border bg-card p-2 shadow-lg">
-      <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notifications</div>
-      {loading ? (
-        <p className="px-2 py-4 text-[13px] text-muted-foreground">Loading…</p>
-      ) : items.length === 0 ? (
-        <p className="px-2 py-4 text-[13px] text-muted-foreground">All quiet for now.</p>
-      ) : (
-        items.slice(0, 10).map((n) => (
-          <Link
-            key={n.id}
-            href={n.href ?? "/dashboard"}
-            onClick={onClose}
-            className="block rounded-lg px-2 py-2 hover:bg-muted"
-          >
-            <p className="text-[13px] font-medium">{n.title}</p>
-            {n.body && <p className="mt-0.5 text-[12px] text-muted-foreground">{n.body}</p>}
-          </Link>
-        ))
-      )}
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={label} {...props}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
