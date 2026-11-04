@@ -1,8 +1,12 @@
-import { AppShell } from "@/components/app-shell";
+import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { ProspectsTable } from "@/components/prospects-table";
-import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import { listProspects } from "@/lib/services/prospects";
+import { Plus, Upload } from "lucide-react";
+
+export const metadata = { title: "Prospects" };
 
 export default async function ProspectsPage({
   searchParams,
@@ -18,38 +22,40 @@ export default async function ProspectsPage({
     if (typeof v === "string" && v) filters[k] = v;
   }
 
-  const result = await listProspects({ user }, {
-    q: filters.q,
-    stages: filters.stage?.split(",") as never,    industry: filters.industry,
-    fit: filters.fit as never,
-    priority: filters.priority as never,
-    sort: (filters.sort as never) ?? "newest",
-    page: Number(filters.page ?? 1),
-    pageSize: Number(filters.pageSize ?? 50),
-  });
+  const result = await listProspects(
+    { user },
+    {
+      q: filters.q,
+      stages: filters.stage?.split(",") as never,
+      industry: filters.industry,
+      fit: filters.fit as never,
+      priority: filters.priority as never,
+      sort: (filters.sort as never) ?? "newest",
+      page: Number(filters.page ?? 1),
+      pageSize: Number(filters.pageSize ?? 50),
+    },
+  );
 
   return (
-    <AppShell user={user} notifications={[]}>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-[15px] font-semibold tracking-tight">Prospects</h2>
-          <p className="text-[12px] text-muted-foreground">{result.total} in workspace</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <a
-            href="/prospects/import"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 h-9 text-[13px] font-medium hover:bg-muted"
-          >
-            <Plus className="size-3.5" /> Import
-          </a>
-          <a
-            href="/prospects/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 h-9 text-[13px] font-medium text-primary-foreground hover:brightness-110"
-          >
-            <Plus className="size-3.5" /> New prospect
-          </a>
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="Prospects"
+        description="Research the right businesses. Keep the next action clear."
+        actions={
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/prospects/import">
+                <Upload aria-hidden="true" /> Import
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/prospects/new">
+                <Plus aria-hidden="true" /> New prospect
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       <ProspectsTable
         initialRows={result.rows}
@@ -64,6 +70,6 @@ export default async function ProspectsPage({
           page: filters.page ?? "1",
         }}
       />
-    </AppShell>
+    </>
   );
 }

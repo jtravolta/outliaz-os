@@ -23,6 +23,7 @@ export default function UiReviewPage() {
         workspaceName: "Personal workspace",
       }}
       notifications={[]}
+      command={<CommandPalette />}
     >
       <div className="review-title">
         <div>
@@ -109,7 +110,6 @@ export default function UiReviewPage() {
         UI review. Navigation opens the existing app, where sign-in may be
         required. Import and draft functionality will be reviewed separately.
       </p>
-      <CommandPalette />
     </AppShell>
   );
 }

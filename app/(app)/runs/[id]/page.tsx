@@ -1,13 +1,17 @@
-import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { getSession } from "@/lib/auth/session";
+
+export const metadata = { title: "Run" };
 
 export default async function RunDetailPage() {
   const user = await getSession();
   if (!user) return null;
   return (
-    <AppShell user={user} notifications={[]}>
-      <h2 className="text-[15px] font-semibold tracking-tight">Run</h2>
-      <p className="mt-1 text-[12.5px] text-muted-foreground">Run detail, counters and sample items.</p>
-    </AppShell>
+    <>
+      <PageHeader
+        title="Run"
+        description="Run detail, counters and sample items."
+      />
+    </>
   );
 }

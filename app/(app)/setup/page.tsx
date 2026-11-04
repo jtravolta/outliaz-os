@@ -1,13 +1,14 @@
-import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { getSession } from "@/lib/auth/session";
+
+export const metadata = { title: "Setup" };
 
 export default async function SetupPage() {
   const user = await getSession();
   if (!user) return null;
   return (
-    <AppShell user={user} notifications={[]}>
-      <h2 className="text-[15px] font-semibold tracking-tight">Setup</h2>
-      <p className="mt-1 text-[12.5px] text-muted-foreground">Workspace configuration wizard.</p>
-    </AppShell>
+    <>
+      <PageHeader title="Setup" description="Workspace configuration wizard." />
+    </>
   );
 }

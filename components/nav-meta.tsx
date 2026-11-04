@@ -60,7 +60,7 @@ export function titleFor(path: string) {
   if (base.startsWith("/sequences/")) return "Sequence";
   if (base.startsWith("/inbox/")) return "Reply";
   if (base.startsWith("/library/")) return "Offers";
-  if (base.startsWith("/settings/")) return "Settings";
+  if (base === "/settings" || base.startsWith("/settings/")) return "Settings";
   if (base === "/ui-review") return "Today";
   return "Outliaz OS";
 }

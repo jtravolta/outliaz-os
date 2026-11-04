@@ -3,26 +3,55 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
-import { Button, Field, Input, Select, Textarea } from "@/components/ui/primitives";
+import {
+  Button,
+  Field,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/ui/primitives";
 import { Drawer } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { allowedTransitions, missing, qualificationMissing, researchMissing } from "@/lib/taxonomy/gates";
+import {
+  allowedTransitions,
+  missing,
+  qualificationMissing,
+  researchMissing,
+} from "@/lib/taxonomy/gates";
 import { label } from "@/lib/taxonomy/enums";
 import type { ProspectWithRelations } from "@/lib/services/prospects";
+import { formatWorkspaceDate } from "@/lib/format";
 
 const TABS = ["Overview", "Research", "Timeline", "Emails", "Notes"] as const;
 
 type Detail = {
   prospect: ProspectWithRelations;
   notes: { id: string; bodyMd: string; createdAt: string }[];
-  events: { id: string; type: string; payload: Record<string, unknown>; createdAt: string }[];
-  messages: { id: string; subject: string; status: string; sentAt: string | null; bodyMd: string; openCount: number }[];
+  events: {
+    id: string;
+    type: string;
+    payload: Record<string, unknown>;
+    createdAt: string;
+  }[];
+  messages: {
+    id: string;
+    subject: string;
+    status: string;
+    sentAt: string | null;
+    bodyMd: string;
+    openCount: number;
+  }[];
   ownerName?: string | null;
   allowedTransitions: string[];
 };
 
-export function ProspectDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+export function ProspectDrawer({
+  id,
+  onClose,
+}: {
+  id: string;
+  onClose: () => void;
+}) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +64,8 @@ export function ProspectDrawer({ id, onClose }: { id: string; onClose: () => voi
       .then(async (r) => ({ ok: r.ok, data: await r.json() }))
       .then(({ ok, data }) => {
         if (!on) return;
-        if (!ok) throw new Error(data?.error?.message ?? "Failed to load prospect");
+        if (!ok)
+          throw new Error(data?.error?.message ?? "Failed to load prospect");
         setDetail(data as Detail);
       })
       .catch((e) => toast("error", { description: (e as Error).message }))
@@ -52,10 +82,20 @@ export function ProspectDrawer({ id, onClose }: { id: string; onClose: () => voi
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-3.5">
           <div>
-            <h2 className="text-[15px] font-semibold tracking-tight">{detail?.prospect?.business_name}</h2>
-            <p className="text-[12px] text-muted-foreground">{detail?.prospect?.domain_normalized}</p>
+            <h2 className="text-[15px] font-semibold tracking-tight">
+              {detail?.prospect?.business_name}
+            </h2>
+            <p className="text-[12px] text-muted-foreground">
+              {detail?.prospect?.domain_normalized}
+            </p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-muted-foreground hover:bg-muted">✕</button>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="border-b border-border px-5">
@@ -65,7 +105,9 @@ export function ProspectDrawer({ id, onClose }: { id: string; onClose: () => voi
                 key={t}
                 onClick={() => setTab(t)}
                 className={`whitespace-nowrap border-b-2 px-2.5 py-2 text-[13px] font-medium transition-colors ${
-                  tab === t ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                  tab === t
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {t}
@@ -109,7 +151,9 @@ function OverviewTab({ detail }: { detail: Detail }) {
     });
     const data = await res.json();
     if (!res.ok) {
-      toast("error", { description: data?.error?.message ?? "Transition failed" });
+      toast("error", {
+        description: data?.error?.message ?? "Transition failed",
+      });
       return;
     }
     toast("success", { description: `Moved to ${to}` });
@@ -126,7 +170,12 @@ function OverviewTab({ detail }: { detail: Detail }) {
       {p.is_duplicate_candidate && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
           Possible duplicate candidate.{" "}
-          <Link href={`/prospects/${p.id}?tab=merge`} className="font-semibold underline">Review merge</Link>
+          <Link
+            href={`/prospects/${p.id}?tab=merge`}
+            className="font-semibold underline"
+          >
+            Review merge
+          </Link>
         </div>
       )}
 
@@ -144,13 +193,22 @@ function OverviewTab({ detail }: { detail: Detail }) {
         <KV k="Contactability" v={p.contactability} />
         <KV k="Quality" v={p.contact_quality} />
         <KV k="Email" v={p.contact_email} />
-        <KV k="Last contacted" v={p.last_contacted_at ? new Date(p.last_contacted_at).toISOString() : null} />
+        <KV
+          k="Last contacted"
+          v={
+            p.last_contacted_at
+              ? new Date(p.last_contacted_at).toISOString()
+              : null
+          }
+        />
       </section>
 
       <section className="rounded-xl border border-border">
         <SectionHead>Next action</SectionHead>
         <p className="text-[13px]">{p.next_action ?? "—"}</p>
-        <p className="mt-1 text-[12px] text-muted-foreground">Follow-up {p.follow_up_date ?? "—"}</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          Follow-up {p.follow_up_date ?? "—"}
+        </p>
       </section>
 
       <section className="rounded-xl border border-border">
@@ -158,13 +216,18 @@ function OverviewTab({ detail }: { detail: Detail }) {
         <div className="flex items-center gap-2">
           <Select value={stage} onValueChange={(v) => setStage(v)}>
             {detail.allowedTransitions.map((s) => (
-              <option key={s} value={s}>{label("stage", s)}</option>
+              <option key={s} value={s}>
+                {label("stage", s)}
+              </option>
             ))}
           </Select>
-          <Button size="sm" onClick={() => void transition(stage)}>Save stage</Button>
+          <Button size="sm" onClick={() => void transition(stage)}>
+            Save stage
+          </Button>
         </div>
         <p className="mt-2 text-[12px] text-muted-foreground">
-          Allowed from <strong>{p.stage}</strong>: {detail.allowedTransitions.join(", ") || "terminal"}
+          Allowed from <strong>{p.stage}</strong>:{" "}
+          {detail.allowedTransitions.join(", ") || "terminal"}
         </p>
       </section>
 
@@ -178,7 +241,9 @@ function OverviewTab({ detail }: { detail: Detail }) {
 
 function SectionHead({ children }: { children: ReactNode }) {
   return (
-    <div className="border-b border-border px-4 py-2.5 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase">{children}</div>
+    <div className="border-b border-border px-4 py-2.5 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase">
+      {children}
+    </div>
   );
 }
 
@@ -197,17 +262,29 @@ function GateRows({ prospect }: { prospect: ProspectWithRelations }) {
   return (
     <div className="space-y-3 px-4 py-3">
       <div>
-        <p className="mb-1 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase">Research gate ({research.length} missing)</p>
-        {research.length === 0 && <p className="text-[12.5px] text-emerald-600">Research complete.</p>}
+        <p className="mb-1 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Research gate ({research.length} missing)
+        </p>
+        {research.length === 0 && (
+          <p className="text-[12.5px] text-emerald-600">Research complete.</p>
+        )}
         {research.map((r) => (
-          <p key={r.key} className="text-[12.5px]">{r.ok ? "✓" : "✕"} {r.label}</p>
+          <p key={r.key} className="text-[12.5px]">
+            {r.ok ? "✓" : "✕"} {r.label}
+          </p>
         ))}
       </div>
       <div>
-        <p className="mb-1 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase">Qualification gate ({qualification.length} missing)</p>
-        {qualification.length === 0 && <p className="text-[12.5px] text-emerald-600">Qualified.</p>}
+        <p className="mb-1 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Qualification gate ({qualification.length} missing)
+        </p>
+        {qualification.length === 0 && (
+          <p className="text-[12.5px] text-emerald-600">Qualified.</p>
+        )}
         {qualification.map((r) => (
-          <p key={r.key} className="text-[12.5px]">{r.ok ? "✓" : "✕"} {r.label}</p>
+          <p key={r.key} className="text-[12.5px]">
+            {r.ok ? "✓" : "✕"} {r.label}
+          </p>
         ))}
       </div>
     </div>
@@ -250,14 +327,20 @@ function ResearchTab({ detail }: { detail: Detail }) {
         industry: form.industry || undefined,
         business_type_id: form.business_type_id || undefined,
         company_size: form.company_size || undefined,
-        employee_count: form.employee_count ? Number(form.employee_count) : undefined,
+        employee_count: form.employee_count
+          ? Number(form.employee_count)
+          : undefined,
         country_code: form.country_code || undefined,
         city: form.city || undefined,
         region: form.region || undefined,
         fit: form.fit || undefined,
         priority: form.priority || undefined,
-        opportunities: form.opportunities ? form.opportunities.split(",").filter(Boolean) : undefined,
-        services: form.services ? form.services.split(",").filter(Boolean) : undefined,
+        opportunities: form.opportunities
+          ? form.opportunities.split(",").filter(Boolean)
+          : undefined,
+        services: form.services
+          ? form.services.split(",").filter(Boolean)
+          : undefined,
         contact_name: form.contact_name || undefined,
         contact_first_name: form.contact_first_name || undefined,
         contact_last_name: form.contact_last_name || undefined,
@@ -270,7 +353,8 @@ function ResearchTab({ detail }: { detail: Detail }) {
       }),
     });
     const data = await res.json();
-    if (!res.ok) toast("error", { description: data?.error?.message ?? "Save failed" });
+    if (!res.ok)
+      toast("error", { description: data?.error?.message ?? "Save failed" });
     else toast("success", { description: "Saved" });
   };
 
@@ -281,7 +365,8 @@ function ResearchTab({ detail }: { detail: Detail }) {
       body: JSON.stringify({ to }),
     });
     const data = await res.json();
-    if (!res.ok) toast("error", { description: data?.error?.message ?? "Gate failed" });
+    if (!res.ok)
+      toast("error", { description: data?.error?.message ?? "Gate failed" });
     else toast("success", { description: `Marked ${to}` });
   };
 
@@ -289,26 +374,48 @@ function ResearchTab({ detail }: { detail: Detail }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold">Classification</span>
-        <Button size="sm" variant="outline" onClick={() => void qualify("RESEARCHED")}>Mark researched</Button>
-        <Button size="sm" onClick={() => void qualify("QUALIFIED")}>Qualify</Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void qualify("RESEARCHED")}
+        >
+          Mark researched
+        </Button>
+        <Button size="sm" onClick={() => void qualify("QUALIFIED")}>
+          Qualify
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Industry">
-          <Select value={form.industry} onValueChange={(v) => set("industry", v)}>
+          <Select
+            value={form.industry}
+            onValueChange={(v) => set("industry", v)}
+          >
             <option value="">—</option>
             {INDUSTRY_OPTIONS.map(([slug, labelText]) => (
-              <option key={slug} value={slug}>{labelText}</option>
+              <option key={slug} value={slug}>
+                {labelText}
+              </option>
             ))}
           </Select>
         </Field>
         <Field label="Business type">
-          <Input value={form.business_type_id} onChange={(e) => set("business_type_id", e.target.value)} placeholder="uuid or label" />
+          <Input
+            value={form.business_type_id}
+            onChange={(e) => set("business_type_id", e.target.value)}
+            placeholder="uuid or label"
+          />
         </Field>
         <Field label="Company size">
-          <Select value={form.company_size} onValueChange={(v) => set("company_size", v)}>
+          <Select
+            value={form.company_size}
+            onValueChange={(v) => set("company_size", v)}
+          >
             {SIZE_OPTIONS.map(([slug, labelText]) => (
-              <option key={slug} value={slug}>{labelText}</option>
+              <option key={slug} value={slug}>
+                {labelText}
+              </option>
             ))}
           </Select>
         </Field>
@@ -322,7 +429,10 @@ function ResearchTab({ detail }: { detail: Detail }) {
           </Select>
         </Field>
         <Field label="Priority">
-          <Select value={form.priority} onValueChange={(v) => set("priority", v)}>
+          <Select
+            value={form.priority}
+            onValueChange={(v) => set("priority", v)}
+          >
             <option value="LOW">Low</option>
             <option value="MEDIUM">Medium</option>
             <option value="HIGH">High</option>
@@ -330,7 +440,10 @@ function ResearchTab({ detail }: { detail: Detail }) {
           </Select>
         </Field>
         <Field label="Contact quality">
-          <Select value={form.contact_quality} onValueChange={(v) => set("contact_quality", v)}>
+          <Select
+            value={form.contact_quality}
+            onValueChange={(v) => set("contact_quality", v)}
+          >
             <option value="UNKNOWN">Unknown</option>
             <option value="UNVERIFIED">Unverified</option>
             <option value="VERIFIED">Verified</option>
@@ -340,54 +453,99 @@ function ResearchTab({ detail }: { detail: Detail }) {
       </div>
 
       <Field label="Opportunities (comma separated slugs)">
-        <Input value={form.opportunities} onChange={(e) => set("opportunities", e.target.value)} placeholder="NO_WEBSITE, OUTDATED_WEBSITE" />
+        <Input
+          value={form.opportunities}
+          onChange={(e) => set("opportunities", e.target.value)}
+          placeholder="NO_WEBSITE, OUTDATED_WEBSITE"
+        />
       </Field>
       <Field label="Services (comma separated slugs)">
-        <Input value={form.services} onChange={(e) => set("services", e.target.value)} placeholder="WEBSITE_REDESIGN, BOOKING_SYSTEM" />
+        <Input
+          value={form.services}
+          onChange={(e) => set("services", e.target.value)}
+          placeholder="WEBSITE_REDESIGN, BOOKING_SYSTEM"
+        />
       </Field>
 
       <Field label="Contact name">
-        <Input value={form.contact_name} onChange={(e) => set("contact_name", e.target.value)} />
+        <Input
+          value={form.contact_name}
+          onChange={(e) => set("contact_name", e.target.value)}
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="First name">
-          <Input value={form.contact_first_name} onChange={(e) => set("contact_first_name", e.target.value)} />
+          <Input
+            value={form.contact_first_name}
+            onChange={(e) => set("contact_first_name", e.target.value)}
+          />
         </Field>
         <Field label="Last name">
-          <Input value={form.contact_last_name} onChange={(e) => set("contact_last_name", e.target.value)} />
+          <Input
+            value={form.contact_last_name}
+            onChange={(e) => set("contact_last_name", e.target.value)}
+          />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Contact email">
-          <Input value={form.contact_email} onChange={(e) => set("contact_email", e.target.value)} />
+          <Input
+            value={form.contact_email}
+            onChange={(e) => set("contact_email", e.target.value)}
+          />
         </Field>
         <Field label="Contact role">
-          <Input value={form.contact_role} onChange={(e) => set("contact_role", e.target.value)} />
+          <Input
+            value={form.contact_role}
+            onChange={(e) => set("contact_role", e.target.value)}
+          />
         </Field>
       </div>
 
       <Field label="Country code">
-        <Input value={form.country_code} onChange={(e) => set("country_code", e.target.value)} placeholder="GB" />
+        <Input
+          value={form.country_code}
+          onChange={(e) => set("country_code", e.target.value)}
+          placeholder="GB"
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="City">
-          <Input value={form.city} onChange={(e) => set("city", e.target.value)} />
+          <Input
+            value={form.city}
+            onChange={(e) => set("city", e.target.value)}
+          />
         </Field>
         <Field label="Region">
-          <Input value={form.region} onChange={(e) => set("region", e.target.value)} />
+          <Input
+            value={form.region}
+            onChange={(e) => set("region", e.target.value)}
+          />
         </Field>
       </div>
       <Field label="Website">
-        <Input value={form.website} onChange={(e) => set("website", e.target.value)} />
+        <Input
+          value={form.website}
+          onChange={(e) => set("website", e.target.value)}
+        />
       </Field>
       <Field label="Next action">
-        <Input value={form.next_action} onChange={(e) => set("next_action", e.target.value)} />
+        <Input
+          value={form.next_action}
+          onChange={(e) => set("next_action", e.target.value)}
+        />
       </Field>
       <Field label="Follow-up date">
-        <Input type="date" value={form.follow_up_date} onChange={(e) => set("follow_up_date", e.target.value)} />
+        <Input
+          type="date"
+          value={form.follow_up_date}
+          onChange={(e) => set("follow_up_date", e.target.value)}
+        />
       </Field>
 
-      <Button size="sm" onClick={() => void save}>Save classification</Button>
+      <Button size="sm" onClick={() => void save}>
+        Save classification
+      </Button>
     </div>
   );
 }
@@ -424,20 +582,36 @@ const SIZE_OPTIONS = [
 
 function TimelineTab({ detail }: { detail: Detail }) {
   const items = [
-    ...detail.events.map((e) => ({ id: e.id, type: e.type, payload: e.payload, at: e.createdAt })),
+    ...detail.events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      payload: e.payload,
+      at: e.createdAt,
+    })),
     ...detail.messages
       .filter((m) => m.status !== "QUEUED")
-      .map((m) => ({ id: `m-${m.id}`, type: "message", payload: { subject: m.subject, status: m.status }, at: m.sentAt ?? "" })),
+      .map((m) => ({
+        id: `m-${m.id}`,
+        type: "message",
+        payload: { subject: m.subject, status: m.status },
+        at: m.sentAt ?? "",
+      })),
   ];
   return (
     <div className="flex flex-col gap-2">
-      {items.length === 0 && <p className="text-[13px] text-muted-foreground">No activity yet.</p>}
+      {items.length === 0 && (
+        <p className="text-[13px] text-muted-foreground">No activity yet.</p>
+      )}
       {[...items]
         .sort((a, b) => String(b.at).localeCompare(String(a.at)))
         .map((e) => (
           <div key={e.id} className="rounded-lg border border-border px-3 py-2">
-            <p className="text-[12.5px] font-semibold capitalize">{e.type.replace(/_/g, " ")}</p>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">{e.at}</p>
+            <p className="text-[12.5px] font-semibold capitalize">
+              {e.type.replace(/_/g, " ")}
+            </p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              {formatWorkspaceDate(e.at)}
+            </p>
           </div>
         ))}
     </div>
@@ -445,54 +619,37 @@ function TimelineTab({ detail }: { detail: Detail }) {
 }
 
 function EmailsTab({ detail }: { detail: Detail }) {
-  const { toast } = useToast();
-  const [to, setTo] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-
-  const send = async () => {
-    if (!to || !subject || !body) {
-      toast("error", { description: "Fill to, subject and body" });
-      return;
-    }
-    const res = await fetch(`/api/prospects/${detail.prospect.id}/emails`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ to, subject, body }),
-    });
-    const data = await res.json();
-    if (!res.ok) toast("error", { description: data?.error?.message ?? "Send failed" });
-    else toast("success", { description: "Email sent" });
-  };
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
-        <h3 className="text-[13px] font-semibold">Send manual email</h3>
-        <Field label="To">
-          <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder={detail.prospect.contact_email ?? ""} />
-        </Field>
-        <Field label="Subject">
-          <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
-        </Field>
-        <Field label="Body">
-          <Textarea value={body} onChange={(e) => setBody(e.target.value)} />
-        </Field>
-        <Button size="sm" onClick={() => void send} disabled={!to || !subject || !body}>
-          <Send className="size-3.5" /> Send
-        </Button>
+        <h3 className="text-[13px] font-semibold">Draft only</h3>
+        <p className="text-[12px] text-muted-foreground">
+          Sending is disabled. Prepare and save the first email in Outreach.
+        </p>
+        <Link
+          href={`/outreach?prospect=${detail.prospect.id}`}
+          className="text-[13px] font-semibold text-primary hover:underline"
+        >
+          Open draft editor
+        </Link>
       </div>
 
       <div className="flex flex-col gap-2">
-        {detail.messages.length === 0 && <p className="text-[13px] text-muted-foreground">No emails yet.</p>}
+        {detail.messages.length === 0 && (
+          <p className="text-[13px] text-muted-foreground">No emails yet.</p>
+        )}
         {detail.messages.map((m) => (
           <div key={m.id} className="rounded-lg border border-border px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[13px] font-semibold">{m.subject}</p>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase">{m.status}</span>
+              <span className="text-[11px] font-medium text-muted-foreground uppercase">
+                {m.status}
+              </span>
             </div>
             <p className="mt-1 text-[12px] text-muted-foreground">{m.bodyMd}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">{m.openCount} opens</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {m.openCount} opens
+            </p>
           </div>
         ))}
       </div>
@@ -512,7 +669,8 @@ function NotesTab({ detail }: { detail: Detail }) {
       body: JSON.stringify({ body }),
     });
     const data = await res.json();
-    if (!res.ok) toast("error", { description: data?.error?.message ?? "Failed" });
+    if (!res.ok)
+      toast("error", { description: data?.error?.message ?? "Failed" });
     else {
       setBody("");
       toast("success", { description: "Note added" });
@@ -528,14 +686,22 @@ function NotesTab({ detail }: { detail: Detail }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
-        <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Add a note…" />
-        <Button size="sm" onClick={() => void add} disabled={!body.trim()}>Add note</Button>
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Add a note…"
+        />
+        <Button size="sm" onClick={() => void add} disabled={!body.trim()}>
+          Add note
+        </Button>
       </div>
       <div className="flex flex-col gap-2">
         {detail.notes.map((n) => (
           <div key={n.id} className="rounded-lg border border-border px-3 py-2">
             <p className="text-[13px] whitespace-pre-wrap">{n.bodyMd}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">{n.createdAt}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {n.createdAt}
+            </p>
           </div>
         ))}
       </div>

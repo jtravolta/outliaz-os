@@ -70,17 +70,14 @@ export function CommandPalette() {
     return (
       <button
         data-command-launcher
+        type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-4 bottom-4 z-50 flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-[13px] font-medium text-muted-foreground shadow-lg hover:text-foreground"
+        className="command-trigger"
       >
-        <Command className="size-4" aria-hidden="true" />{" "}
-        <span className="hidden sm:inline">Search…</span>{" "}
-        <kbd
-          aria-hidden="true"
-          className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]"
-        >
-          ⌘K
-        </kbd>
+        <Command className="shell-icon" aria-hidden="true" />
+        <span className="command-trigger-label">Search</span>
+        <span className="sr-only">Open command palette</span>
+        <kbd aria-hidden="true">⌘K</kbd>
       </button>
     );
   }

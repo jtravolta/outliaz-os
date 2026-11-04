@@ -7,10 +7,13 @@
 - Fixed missing global stylesheet import discovered in original root layout; added focused shadcn Radix Button/Sheet/Tooltip without overwriting legacy primitives.
 - Source baseline committed as d619422 with secrets/data/artifacts excluded. User-provided Git identity configured repository-locally. agent-browser installed under ~/.local without sudo; downloaded browser successfully launched.
 - Added eight Playwright regression checks including axe accessibility scans in both themes, preference-storage failure, short desktop reachability and mobile command-launcher integration. All eight passed against the UI dev server; final production run recorded below when verified.
+- Repaired all eight UX audit findings: semantic reply detail routes and mobile inbox cards, prospect drawer links, draft-only Outreach persistence, accessible Settings labels, consistent Offers/page headings, friendly formatting, and mobile Dashboard overflow.
+- Outreach drafts are stored under workspace-scoped `prospects.custom_fields.outreachDraft`; saving creates no message, enrollment, queue item, provider call, or send. Drafting works at NEW and without an email.
+- Added six focused UX regression tests, including an intercepted draft save that proves the UI uses only the draft endpoint.
 
 - Compared the existing Next.js app with BUILD-PLAN.md and canonical TAXONOMY.md.
 - Approved the focused personal workflow design: file import -> offer -> saved prospect email draft, no sending.
-- Wrote the implementation plan; implementation has not started.
+- Wrote and executed the UX audit repair plan.
 - Read all five supplied handoff files and their working dist/index.html; incorporated their UI/interaction requirements and documented conflicts with canonical rules.
 - Retained the handoff source unchanged at `/home/swiss/Desktop/outliaz-os-handoff`.
 
@@ -27,10 +30,12 @@
 
 - Git author name/email missing: documentation commit failed; no identity invented or configured.
 - agent-browser CLI is not installed. Built-in browser inspection was used for the hosted reference; screenshot capture failed because its desktop tab was not visible.
-- No typecheck/build/test/browser acceptance run for the planned implementation; no claim of working persistence or real integrations.
+- No schema migration, personal-data import, external provider call, email send, scrape, or deployment was performed.
 - Shared UI slice is authorized; later functional slices still require their planned scope gates. No real database migration/import, external email, paid scraping or public deployment authorized by this UI request.
 
 ## Verification evidence
+
+- UX repair verification on 2026-11-04: `npm run typecheck`, `npm run fmt:check`, `npx playwright test --workers=1` (14/14 passed), and `NEXT_DIST_DIR=.next-ui-build npm run build` all passed.
 
 - Final production verification: UI_TEST_URL=http://127.0.0.1:3002 npm test -- --workers=1 -> 8 passed (16.2s), including zero axe violations in light and dark review screens.
 - Final production taste inspector: 0 FAIL, 2 documented WARN; all six generated dark screenshot sheets/folds opened, plus fresh light screenshots at 1440/768/390. IBM Plex Sans loaded 100%; no horizontal overflow. Reference palette and unequal natural panel height intentionally retained.

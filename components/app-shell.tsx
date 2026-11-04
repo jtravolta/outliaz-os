@@ -43,11 +43,13 @@ export function AppShell({
   notifications,
   children,
   preview = false,
+  command,
 }: {
   user: ShellUser;
   notifications: NotificationItem[];
   children: ReactNode;
   preview?: boolean;
+  command?: ReactNode;
 }) {
   const pathname = usePathname();
   const { theme, collapsed, toggleTheme, toggleSidebar } =
@@ -141,6 +143,7 @@ export function AppShell({
             </span>
           </div>
           <div className="topbar-actions">
+            {command ? <div className="topbar-command">{command}</div> : null}
             <span className="workspace-mode">
               {preview ? "UI preview" : "Local workspace"}
             </span>
