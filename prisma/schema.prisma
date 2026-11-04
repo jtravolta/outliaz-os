@@ -1,0 +1,797 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model audit_logs {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String     @db.Uuid
+  user_id      String?    @db.Uuid
+  action       String     @db.VarChar(80)
+  target_type  String?    @db.VarChar(60)
+  target_id    String?    @db.VarChar(80)
+  meta         Json       @default("{}")
+  ip           String?    @db.VarChar(60)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  users        users?     @relation(fields: [user_id], references: [id], onUpdate: NoAction, map: "audit_logs_user_id_users_id_fk")
+  workspaces   workspaces @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "audit_logs_workspace_id_workspaces_id_fk")
+
+  @@index([workspace_id, created_at], map: "audit_ws_idx")
+}
+
+model business_types {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  industry_slug String      @db.VarChar(60)
+  label         String      @db.VarChar(100)
+  slug          String      @db.VarChar(100)
+  is_system     Boolean     @default(true)
+  archived_at   DateTime?   @db.Timestamptz(6)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  industries    industries  @relation(fields: [industry_slug], references: [slug], onDelete: NoAction, onUpdate: NoAction, map: "business_types_industry_slug_industries_slug_fk")
+  prospects     prospects[]
+
+  @@unique([industry_slug, slug], map: "bt_industry_slug_uq")
+  @@index([industry_slug], map: "bt_industry_idx")
+}
+
+model deleted_emails {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id     String     @db.Uuid
+  email_normalized String
+  created_at       DateTime   @default(now()) @db.Timestamptz(6)
+  workspaces       workspaces @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "deleted_emails_workspace_id_workspaces_id_fk")
+
+  @@unique([workspace_id, email_normalized], map: "deleted_emails_uq")
+}
+
+model dns_cache {
+  domain     String   @id @db.VarChar(255)
+  has_mx     Boolean?
+  checked_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model email_templates {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id   String           @db.Uuid
+  name           String           @db.VarChar(160)
+  subject        String           @db.VarChar(150)
+  body_md        String
+  offer_id       String?          @db.Uuid
+  category       String?          @db.VarChar(60)
+  archived_at    DateTime?        @db.Timestamptz(6)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  offers         offers?          @relation(fields: [offer_id], references: [id], onUpdate: NoAction, map: "email_templates_offer_id_offers_id_fk")
+  workspaces     workspaces       @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "email_templates_workspace_id_workspaces_id_fk")
+  sequence_steps sequence_steps[]
+}
+
+model enrollments {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String            @db.Uuid
+  sequence_id  String            @db.Uuid
+  prospect_id  String            @db.Uuid
+  status       enrollment_status @default(ACTIVE)
+  current_step Int               @default(0)
+  next_send_at DateTime?         @db.Timestamptz(6)
+  stop_reason  String?           @db.VarChar(60)
+  ooo_pushes   Int               @default(0)
+  enrolled_by  String?           @db.Uuid
+  created_at   DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime          @default(now()) @db.Timestamptz(6)
+  users        users?            @relation(fields: [enrolled_by], references: [id], onUpdate: NoAction, map: "enrollments_enrolled_by_users_id_fk")
+  prospects    prospects         @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "enrollments_prospect_id_prospects_id_fk")
+  sequences    sequences         @relation(fields: [sequence_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "enrollments_sequence_id_sequences_id_fk")
+  workspaces   workspaces        @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "enrollments_workspace_id_workspaces_id_fk")
+  messages     messages[]
+
+  @@unique([workspace_id, prospect_id], map: "enroll_one_active_uq", where: raw("(status = 'ACTIVE'::enrollment_status)"))
+  @@unique([sequence_id, prospect_id], map: "enroll_seq_prospect_uq")
+  @@index([status, next_send_at], map: "enroll_due_idx")
+}
+
+model export_jobs {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String     @db.Uuid
+  filters      Json       @default("{}")
+  status       job_status @default(PENDING)
+  row_count    Int        @default(0)
+  csv          String?
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  workspaces   workspaces @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "export_jobs_workspace_id_workspaces_id_fk")
+}
+
+model import_batches {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id   String        @db.Uuid
+  kind           String        @default("CSV") @db.VarChar(20)
+  file_name      String?       @db.VarChar(255)
+  mapping        Json          @default("{}")
+  rows           Json          @default("[]")
+  status         import_status @default(PREVIEW)
+  processed      Int           @default(0)
+  rows_total     Int           @default(0)
+  rows_imported  Int           @default(0)
+  rows_invalid   Int           @default(0)
+  rows_duplicate Int           @default(0)
+  error_report   Json          @default("[]")
+  created_by     String?       @db.Uuid
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime      @default(now()) @db.Timestamptz(6)
+  users          users?        @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "import_batches_created_by_users_id_fk")
+  workspaces     workspaces    @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "import_batches_workspace_id_workspaces_id_fk")
+
+  @@index([workspace_id, created_at], map: "imports_ws_idx")
+}
+
+model industries {
+  slug           String           @id @db.VarChar(60)
+  label          String           @db.VarChar(100)
+  is_system      Boolean          @default(true)
+  business_types business_types[]
+  prospects      prospects[]
+}
+
+model integration_credentials {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id      String          @db.Uuid
+  kind              credential_kind
+  label             String?         @db.VarChar(120)
+  config            Json            @default("{}")
+  secret_ciphertext String?
+  secret_iv         String?
+  secret_tag        String?
+  verified_at       DateTime?       @db.Timestamptz(6)
+  last_error        String?
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime        @default(now()) @db.Timestamptz(6)
+  workspaces        workspaces      @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "integration_credentials_workspace_id_workspaces_id_fk")
+
+  @@unique([workspace_id, kind], map: "creds_ws_kind_uq")
+}
+
+model jobs {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String     @db.Uuid
+  type         job_type
+  payload      Json       @default("{}")
+  status       job_status @default(PENDING)
+  run_at       DateTime   @default(now()) @db.Timestamptz(6)
+  attempts     Int        @default(0)
+  max_attempts Int        @default(5)
+  locked_at    DateTime?  @db.Timestamptz(6)
+  locked_by    String?    @db.VarChar(80)
+  last_error   String?
+  dedupe_key   String?    @unique(map: "jobs_dedupe_uq") @db.VarChar(200)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  workspaces   workspaces @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "jobs_workspace_id_workspaces_id_fk")
+
+  @@index([status, run_at], map: "jobs_due_idx")
+  @@index([workspace_id, created_at], map: "jobs_ws_idx")
+}
+
+model lead_sources {
+  id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id          String          @db.Uuid
+  name                  String          @db.VarChar(160)
+  description           String?
+  actor_id              String          @db.VarChar(160)
+  actor_name            String?         @db.VarChar(160)
+  input_defaults        Json            @default("{}")
+  mapping               Json            @default("{}")
+  default_industry      String?         @db.VarChar(60)
+  default_market        String?         @db.VarChar(60)
+  default_opportunity   opportunity?
+  qualification_rule_id String?         @db.Uuid
+  schedule              source_schedule @default(OFF)
+  schedule_hour         Int             @default(9)
+  verify_mx             Boolean         @default(false)
+  allow_role_addresses  Boolean         @default(false)
+  archived_at           DateTime?       @db.Timestamptz(6)
+  last_run_at           DateTime?       @db.Timestamptz(6)
+  created_by            String?         @db.Uuid
+  created_at            DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime        @default(now()) @db.Timestamptz(6)
+  users                 users?          @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "lead_sources_created_by_users_id_fk")
+  workspaces            workspaces      @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "lead_sources_workspace_id_workspaces_id_fk")
+  prospects             prospects[]
+  source_runs           source_runs[]
+
+  @@index([workspace_id], map: "sources_ws_idx")
+}
+
+model messages {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id        String          @db.Uuid
+  enrollment_id       String?         @db.Uuid
+  prospect_id         String          @db.Uuid
+  step_id             String?         @db.Uuid
+  to_email            String          @db.VarChar(320)
+  from_email          String          @db.VarChar(320)
+  subject             String          @db.VarChar(200)
+  body_md             String
+  html                String?
+  text                String?
+  provider            String          @default("resend") @db.VarChar(40)
+  provider_message_id String?         @db.VarChar(200)
+  message_id_header   String?         @db.VarChar(320)
+  status              message_status  @default(QUEUED)
+  is_manual           Boolean         @default(false)
+  open_count          Int             @default(0)
+  click_count         Int             @default(0)
+  sent_at             DateTime?       @db.Timestamptz(6)
+  opened_at           DateTime?       @db.Timestamptz(6)
+  clicked_at          DateTime?       @db.Timestamptz(6)
+  error               String?
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+  enrollments         enrollments?    @relation(fields: [enrollment_id], references: [id], onUpdate: NoAction, map: "messages_enrollment_id_enrollments_id_fk")
+  prospects           prospects       @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "messages_prospect_id_prospects_id_fk")
+  sequence_steps      sequence_steps? @relation(fields: [step_id], references: [id], onUpdate: NoAction, map: "messages_step_id_sequence_steps_id_fk")
+  workspaces          workspaces      @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "messages_workspace_id_workspaces_id_fk")
+  replies             replies[]
+
+  @@index([prospect_id], map: "messages_prospect_idx")
+  @@index([workspace_id, created_at], map: "messages_ws_idx")
+}
+
+model notifications {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String     @db.Uuid
+  user_id      String?    @db.Uuid
+  kind         String     @db.VarChar(40)
+  title        String     @db.VarChar(200)
+  body         String?
+  href         String?
+  read_at      DateTime?  @db.Timestamptz(6)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  users        users?     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "notifications_user_id_users_id_fk")
+  workspaces   workspaces @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "notifications_workspace_id_workspaces_id_fk")
+
+  @@index([workspace_id, created_at], map: "notif_ws_idx")
+}
+
+model offer_services {
+  offer_id String  @db.Uuid
+  service  service
+  offers   offers  @relation(fields: [offer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "offer_services_offer_id_offers_id_fk")
+
+  @@id([offer_id, service], map: "offer_services_offer_id_service_pk")
+}
+
+model offers {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id    String            @db.Uuid
+  name            String            @db.VarChar(160)
+  summary         String?
+  value_prop_md   String?
+  price_text      String?           @db.VarChar(120)
+  constraints     String?
+  is_active       Boolean           @default(true)
+  archived_at     DateTime?         @db.Timestamptz(6)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  email_templates email_templates[]
+  offer_services  offer_services[]
+  workspaces      workspaces        @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "offers_workspace_id_workspaces_id_fk")
+}
+
+model prospect_events {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prospect_id   String    @db.Uuid
+  type          String    @db.VarChar(60)
+  payload       Json      @default("{}")
+  actor_user_id String?   @db.Uuid
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  users         users?    @relation(fields: [actor_user_id], references: [id], onUpdate: NoAction, map: "prospect_events_actor_user_id_users_id_fk")
+  prospects     prospects @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospect_events_prospect_id_prospects_id_fk")
+
+  @@index([prospect_id, created_at], map: "events_prospect_idx")
+}
+
+model prospect_notes {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prospect_id    String    @db.Uuid
+  body_md        String
+  author_user_id String?   @db.Uuid
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  users          users?    @relation(fields: [author_user_id], references: [id], onUpdate: NoAction, map: "prospect_notes_author_user_id_users_id_fk")
+  prospects      prospects @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospect_notes_prospect_id_prospects_id_fk")
+}
+
+model prospect_opportunities {
+  prospect_id String      @db.Uuid
+  opportunity opportunity
+  prospects   prospects   @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospect_opportunities_prospect_id_prospects_id_fk")
+
+  @@id([prospect_id, opportunity], map: "prospect_opportunities_prospect_id_opportunity_pk")
+}
+
+model prospect_services {
+  prospect_id String    @db.Uuid
+  service     service
+  prospects   prospects @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospect_services_prospect_id_prospects_id_fk")
+
+  @@id([prospect_id, service], map: "prospect_services_prospect_id_service_pk")
+}
+
+model prospect_tags {
+  prospect_id String    @db.Uuid
+  tag_id      String    @db.Uuid
+  prospects   prospects @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospect_tags_prospect_id_prospects_id_fk")
+  tags        tags      @relation(fields: [tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospect_tags_tag_id_tags_id_fk")
+
+  @@id([prospect_id, tag_id], map: "prospect_tags_prospect_id_tag_id_pk")
+  @@index([tag_id], map: "pt_tag_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model prospects {
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id             String                   @db.Uuid
+  business_name            String                   @db.VarChar(200)
+  website                  String?
+  domain_normalized        String?                  @db.VarChar(255)
+  industry_slug            String?                  @db.VarChar(60)
+  business_type_id         String?                  @db.Uuid
+  company_size             company_size             @default(UNKNOWN)
+  employee_count           Int?
+  city                     String?                  @db.VarChar(120)
+  region                   String?                  @db.VarChar(120)
+  country_code             String?                  @db.VarChar(2)
+  market                   String?                  @db.VarChar(60)
+  fit                      fit                      @default(UNKNOWN)
+  priority                 priority                 @default(MEDIUM)
+  stage                    stage                    @default(NEW)
+  contactability           contactability           @default(OK)
+  contact_name             String?                  @db.VarChar(120)
+  contact_first_name       String?                  @db.VarChar(80)
+  contact_last_name        String?                  @db.VarChar(80)
+  contact_role             contact_role?
+  contact_email            String?                  @db.VarChar(320)
+  contact_email_normalized String?                  @db.VarChar(320)
+  contact_phone            String?                  @db.VarChar(60)
+  contact_linkedin         String?
+  contact_quality          contact_quality          @default(UNKNOWN)
+  next_action              String?
+  follow_up_date           DateTime?                @db.Date
+  closed_reason            String?
+  gate_override_reason     String?
+  qualification_rule_id    String?                  @db.Uuid
+  qualification_revision   Int?
+  source_id                String?                  @db.Uuid
+  source_run_id            String?                  @db.Uuid
+  source_label             String?                  @db.VarChar(160)
+  owner_user_id            String?                  @db.Uuid
+  is_duplicate_candidate   Boolean                  @default(false)
+  custom_fields            Json                     @default("{}")
+  last_contacted_at        DateTime?                @db.Timestamptz(6)
+  last_reply_at            DateTime?                @db.Timestamptz(6)
+  deleted_at               DateTime?                @db.Timestamptz(6)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  enrollments              enrollments[]
+  messages                 messages[]
+  prospect_events          prospect_events[]
+  prospect_notes           prospect_notes[]
+  prospect_opportunities   prospect_opportunities[]
+  prospect_services        prospect_services[]
+  prospect_tags            prospect_tags[]
+  business_types           business_types?          @relation(fields: [business_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "prospects_business_type_id_business_types_id_fk")
+  industries               industries?              @relation(fields: [industry_slug], references: [slug], onDelete: NoAction, onUpdate: NoAction, map: "prospects_industry_slug_industries_slug_fk")
+  users                    users?                   @relation(fields: [owner_user_id], references: [id], onUpdate: NoAction, map: "prospects_owner_user_id_users_id_fk")
+  lead_sources             lead_sources?            @relation(fields: [source_id], references: [id], onUpdate: NoAction, map: "prospects_source_id_lead_sources_id_fk")
+  source_runs              source_runs?             @relation(fields: [source_run_id], references: [id], onUpdate: NoAction, map: "prospects_source_run_id_source_runs_id_fk")
+  workspaces               workspaces               @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "prospects_workspace_id_workspaces_id_fk")
+  replies                  replies[]
+
+  @@unique([workspace_id, contact_email_normalized], map: "prospects_email_uq", where: raw("((contact_email_normalized IS NOT NULL) AND (deleted_at IS NULL))"))
+  @@index([workspace_id, domain_normalized], map: "prospects_ws_domain_idx")
+  @@index([workspace_id, follow_up_date], map: "prospects_ws_followup_idx")
+  @@index([workspace_id, industry_slug], map: "prospects_ws_industry_idx")
+  @@index([workspace_id, stage, created_at], map: "prospects_ws_stage_idx")
+  @@index([workspace_id, updated_at], map: "prospects_ws_updated_idx")
+}
+
+model qualification_rules {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String     @db.Uuid
+  name         String     @db.VarChar(160)
+  description  String?
+  match        rule_match @default(ALL)
+  conditions   Json       @default("[]")
+  revision     Int        @default(1)
+  is_active    Boolean    @default(true)
+  created_by   String?    @db.Uuid
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime   @default(now()) @db.Timestamptz(6)
+  users        users?     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "qualification_rules_created_by_users_id_fk")
+  workspaces   workspaces @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "qualification_rules_workspace_id_workspaces_id_fk")
+}
+
+model replies {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id     String         @db.Uuid
+  prospect_id      String?        @db.Uuid
+  message_id       String?        @db.Uuid
+  from_email       String         @db.VarChar(320)
+  to_email         String         @db.VarChar(320)
+  subject          String?        @db.VarChar(255)
+  body_text        String?
+  snippet          String?        @db.VarChar(280)
+  received_at      DateTime       @default(now()) @db.Timestamptz(6)
+  imap_uid         Int?
+  imap_uidvalidity Int?
+  imap_folder      String?        @default("INBOX") @db.VarChar(60)
+  is_read          Boolean        @default(false)
+  assigned_user_id String?        @db.Uuid
+  outcome          reply_outcome?
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  users            users?         @relation(fields: [assigned_user_id], references: [id], onUpdate: NoAction, map: "replies_assigned_user_id_users_id_fk")
+  messages         messages?      @relation(fields: [message_id], references: [id], onUpdate: NoAction, map: "replies_message_id_messages_id_fk")
+  prospects        prospects?     @relation(fields: [prospect_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "replies_prospect_id_prospects_id_fk")
+  workspaces       workspaces     @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "replies_workspace_id_workspaces_id_fk")
+
+  @@index([prospect_id], map: "replies_prospect_idx")
+  @@index([workspace_id, received_at], map: "replies_ws_idx")
+}
+
+model sequence_steps {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sequence_id         String           @db.Uuid
+  position            Int
+  template_id         String?          @db.Uuid
+  subject_override    String?          @db.VarChar(150)
+  body_override_md    String?
+  delay_business_days Int              @default(3)
+  messages            messages[]
+  sequences           sequences        @relation(fields: [sequence_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sequence_steps_sequence_id_sequences_id_fk")
+  email_templates     email_templates? @relation(fields: [template_id], references: [id], onUpdate: NoAction, map: "sequence_steps_template_id_email_templates_id_fk")
+
+  @@unique([sequence_id, position], map: "steps_seq_pos_uq")
+}
+
+model sequences {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id   String           @db.Uuid
+  name           String           @db.VarChar(160)
+  description    String?
+  status         sequence_status  @default(DRAFT)
+  created_by     String?          @db.Uuid
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  enrollments    enrollments[]
+  sequence_steps sequence_steps[]
+  users          users?           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "sequences_created_by_users_id_fk")
+  workspaces     workspaces       @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "sequences_workspace_id_workspaces_id_fk")
+}
+
+model source_runs {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id       String       @db.Uuid
+  source_id          String       @db.Uuid
+  apify_run_id       String?      @unique(map: "runs_apify_uq") @db.VarChar(160)
+  status             run_status   @default(QUEUED)
+  input              Json         @default("{}")
+  is_test            Boolean      @default(false)
+  started_at         DateTime?    @db.Timestamptz(6)
+  finished_at        DateTime?    @db.Timestamptz(6)
+  items_fetched      Int          @default(0)
+  items_imported     Int          @default(0)
+  items_duplicate    Int          @default(0)
+  items_invalid      Int          @default(0)
+  items_qualified    Int          @default(0)
+  items_disqualified Int          @default(0)
+  skipped            Json         @default("[]")
+  error              Json?
+  sample_items       Json         @default("[]")
+  created_at         DateTime     @default(now()) @db.Timestamptz(6)
+  prospects          prospects[]
+  lead_sources       lead_sources @relation(fields: [source_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "source_runs_source_id_lead_sources_id_fk")
+  workspaces         workspaces   @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "source_runs_workspace_id_workspaces_id_fk")
+
+  @@index([source_id], map: "runs_source_idx")
+  @@index([workspace_id, created_at], map: "runs_ws_idx")
+}
+
+model suppressions {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id     String             @db.Uuid
+  email_normalized String
+  reason           suppression_reason
+  source           String?            @db.VarChar(120)
+  note             String?
+  created_by       String?            @db.Uuid
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  users            users?             @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "suppressions_created_by_users_id_fk")
+  workspaces       workspaces         @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "suppressions_workspace_id_workspaces_id_fk")
+
+  @@unique([workspace_id, email_normalized], map: "suppressions_uq")
+}
+
+model tags {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id  String          @db.Uuid
+  label         String          @db.VarChar(60)
+  slug          String          @db.VarChar(60)
+  created_at    DateTime        @default(now()) @db.Timestamptz(6)
+  prospect_tags prospect_tags[]
+  workspaces    workspaces      @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "tags_workspace_id_workspaces_id_fk")
+
+  @@unique([workspace_id, slug], map: "tags_ws_slug_uq")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id        String                @db.Uuid
+  email               String                @unique(map: "users_email_uq")
+  name                String                @db.VarChar(120)
+  role                user_role             @default(MEMBER)
+  status              user_status           @default(ACTIVE)
+  avatar_url          String?
+  session_version     Int                   @default(1)
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  audit_logs          audit_logs[]
+  enrollments         enrollments[]
+  import_batches      import_batches[]
+  lead_sources        lead_sources[]
+  notifications       notifications[]
+  prospect_events     prospect_events[]
+  prospect_notes      prospect_notes[]
+  prospects           prospects[]
+  qualification_rules qualification_rules[]
+  replies             replies[]
+  sequences           sequences[]
+  suppressions        suppressions[]
+  workspaces          workspaces            @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "users_workspace_id_workspaces_id_fk")
+
+  @@index([workspace_id], map: "users_ws_idx")
+}
+
+model workspaces {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                    String                    @db.VarChar(255)
+  timezone                String                    @default("Europe/Zurich") @db.VarChar(50)
+  send_window_start       String                    @default("09:00") @db.VarChar(5)
+  send_window_end         String                    @default("17:00") @db.VarChar(5)
+  daily_send_cap          Int                       @default(50)
+  hourly_send_cap         Int                       @default(60)
+  track_opens             Boolean                   @default(true)
+  track_clicks            Boolean                   @default(true)
+  unsubscribe_footer      Boolean                   @default(true)
+  footer_text             String?                   @default("Acme Studio · 12 Marlborough Place, London · You are receiving this because we believe it may be relevant to your business.")
+  setup_completed_at      DateTime?                 @db.Timestamptz(6)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  audit_logs              audit_logs[]
+  deleted_emails          deleted_emails[]
+  email_templates         email_templates[]
+  enrollments             enrollments[]
+  export_jobs             export_jobs[]
+  import_batches          import_batches[]
+  integration_credentials integration_credentials[]
+  jobs                    jobs[]
+  lead_sources            lead_sources[]
+  messages                messages[]
+  notifications           notifications[]
+  offers                  offers[]
+  prospects               prospects[]
+  qualification_rules     qualification_rules[]
+  replies                 replies[]
+  sequences               sequences[]
+  source_runs             source_runs[]
+  suppressions            suppressions[]
+  tags                    tags[]
+  users                   users[]
+}
+
+enum company_size {
+  SOLO
+  MICRO
+  SMALL
+  SMALL_MEDIUM
+  MEDIUM
+  LARGE
+  UNKNOWN
+}
+
+enum contact_quality {
+  VERIFIED
+  UNVERIFIED
+  RISKY
+  BOUNCED
+  UNKNOWN
+}
+
+enum contact_role {
+  OWNER
+  FOUNDER
+  MANAGING_DIRECTOR
+  CEO
+  MARKETING_DIRECTOR
+  MARKETING_MANAGER
+  OPERATIONS_DIRECTOR
+  OPERATIONS_MANAGER
+  GENERAL_MANAGER
+  OTHER_DECISION_MAKER
+}
+
+enum contactability {
+  OK
+  BOUNCED
+  UNSUBSCRIBED
+  DO_NOT_CONTACT
+}
+
+enum credential_kind {
+  APIFY
+  RESEND
+  IMAP
+}
+
+enum enrollment_status {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  STOPPED
+  FAILED
+}
+
+enum fit {
+  STRONG
+  GOOD
+  POSSIBLE
+  POOR
+  UNKNOWN
+}
+
+enum import_status {
+  PREVIEW
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum job_status {
+  PENDING
+  CLAIMED
+  DONE
+  DEAD
+}
+
+enum job_type {
+  APIFY_START
+  APIFY_POLL
+  APIFY_IMPORT
+  SEND_STEP
+  IMAP_SYNC
+  SCHEDULE_SOURCE
+  IMPORT_BATCH
+  EXPORT
+}
+
+enum message_status {
+  QUEUED
+  SENT
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+enum opportunity {
+  NO_WEBSITE
+  OUTDATED_WEBSITE
+  POOR_MOBILE_EXPERIENCE
+  POOR_USER_EXPERIENCE
+  WEAK_BRANDING
+  WEAK_CONVERSION
+  NO_LEAD_CAPTURE
+  NO_ONLINE_BOOKING
+  ECOMMERCE_OPPORTUNITY
+  NEEDS_AUTOMATION
+  NEEDS_WEB_APPLICATION
+  WEBSITE_PERFORMANCE
+  SEO_DISCOVERABILITY
+  UNKNOWN
+}
+
+enum priority {
+  HIGH
+  MEDIUM
+  LOW
+  DISQUALIFIED
+}
+
+enum reply_outcome {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  NOT_INTERESTED
+  OOO
+}
+
+enum rule_match {
+  ALL
+  ANY
+}
+
+enum run_status {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  IMPORTED
+}
+
+enum sequence_status {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum service {
+  WEBSITE_DESIGN
+  WEBSITE_REDESIGN
+  WEBSITE_DEVELOPMENT
+  LANDING_PAGE
+  ECOMMERCE
+  BRAND_IDENTITY
+  BRAND_REFRESH
+  UI_UX_DESIGN
+  WEB_APPLICATION
+  BOOKING_SYSTEM
+  LEAD_GENERATION_SYSTEM
+  BUSINESS_AUTOMATION
+  WEBSITE_OPTIMISATION
+  ONGOING_SUPPORT
+  OTHER
+}
+
+enum source_schedule {
+  OFF
+  DAILY
+  WEEKLY
+}
+
+enum stage {
+  NEW
+  RESEARCHED
+  QUALIFIED
+  CONTACTED
+  FOLLOW_UP
+  REPLIED
+  MEETING
+  PROPOSAL
+  WON
+  LOST
+  DISQUALIFIED
+}
+
+enum suppression_reason {
+  UNSUBSCRIBED
+  HARD_BOUNCE
+  COMPLAINT
+  MANUAL
+  INVALID
+}
+
+enum user_role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum user_status {
+  ACTIVE
+  INVITED
+  DISABLED
+}

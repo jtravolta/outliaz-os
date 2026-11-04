@@ -10,6 +10,8 @@
 - Repaired all eight UX audit findings: semantic reply detail routes and mobile inbox cards, prospect drawer links, draft-only Outreach persistence, accessible Settings labels, consistent Offers/page headings, friendly formatting, and mobile Dashboard overflow.
 - Outreach drafts are stored under workspace-scoped `prospects.custom_fields.outreachDraft`; saving creates no message, enrollment, queue item, provider call, or send. Drafting works at NEW and without an email.
 - Added six focused UX regression tests, including an intercepted draft save that proves the UI uses only the draft endpoint.
+- Started the approved preservation-first Drizzle-to-Prisma migration. Prisma 7.10.1 is pinned, the existing 31-table PostgreSQL schema was introspected read-only, and a parity test confirms Prisma sees the same workspace/user/prospect row counts as PostgreSQL.
+- Created an empty isolated local `outbound_os_prisma_test` database for future migration verification. The current `outbound_os` database was not migrated, reset, seeded, or modified.
 
 - Compared the existing Next.js app with BUILD-PLAN.md and canonical TAXONOMY.md.
 - Approved the focused personal workflow design: file import -> offer -> saved prospect email draft, no sending.
@@ -19,8 +21,9 @@
 
 ## Next
 
-- User authorized the shared UI slice on 2026-11-04: shell/themes/collapse/mobile/minimalist icons. Run only that slice, not the complete backend plan.
-- Review the shared shell at http://127.0.0.1:3002/ui-review (production review build) before moving to file import/research/offer/draft functionality.
+- Convert service modules from Drizzle to Prisma incrementally behind the existing service/API boundaries, starting with a read-only surface and preserving workspace scoping.
+- Establish and verify a Prisma baseline migration against `outbound_os_prisma_test` before transferring migration ownership. Do not apply it to the current database without a separate explicit checkpoint.
+- Connect a separate Supabase development project/branch later using a transaction-pooler runtime URL and session/direct migration URL; do not place credentials in Git or chat.
 
 ## Blocked / unverified
 
@@ -31,6 +34,7 @@
 - Git author name/email missing: documentation commit failed; no identity invented or configured.
 - agent-browser CLI is not installed. Built-in browser inspection was used for the hosted reference; screenshot capture failed because its desktop tab was not visible.
 - No schema migration, personal-data import, external provider call, email send, scrape, or deployment was performed.
+- Supabase CLI/MCP and hosted development credentials are not configured. Hosted verification remains blocked until the user connects a separate development project/branch.
 - Shared UI slice is authorized; later functional slices still require their planned scope gates. No real database migration/import, external email, paid scraping or public deployment authorized by this UI request.
 
 ## Verification evidence
