@@ -12,6 +12,7 @@
 - Added six focused UX regression tests, including an intercepted draft save that proves the UI uses only the draft endpoint.
 - Started the approved preservation-first Drizzle-to-Prisma migration. Prisma 7.10.1 is pinned, the existing 31-table PostgreSQL schema was introspected read-only, and a parity test confirms Prisma sees the same workspace/user/prospect row counts as PostgreSQL.
 - Created an empty isolated local `outbound_os_prisma_test` database for future migration verification. The current `outbound_os` database was not migrated, reset, seeded, or modified.
+- Generated a Prisma baseline migration and applied it only to `outbound_os_prisma_test`. A catalog-level parity test verifies all 31 application tables, enums, constraints (including normalized-email checks), and indexes match the existing database; Prisma's own migration-history table is intentionally excluded.
 
 - Compared the existing Next.js app with BUILD-PLAN.md and canonical TAXONOMY.md.
 - Approved the focused personal workflow design: file import -> offer -> saved prospect email draft, no sending.
@@ -22,7 +23,7 @@
 ## Next
 
 - Convert service modules from Drizzle to Prisma incrementally behind the existing service/API boundaries, starting with a read-only surface and preserving workspace scoping.
-- Establish and verify a Prisma baseline migration against `outbound_os_prisma_test` before transferring migration ownership. Do not apply it to the current database without a separate explicit checkpoint.
+- Convert read-only service functions first, then mutations, while running Drizzle and Prisma side-by-side. Do not mark the baseline as applied on the current database without a separate explicit checkpoint.
 - Connect a separate Supabase development project/branch later using a transaction-pooler runtime URL and session/direct migration URL; do not place credentials in Git or chat.
 
 ## Blocked / unverified
