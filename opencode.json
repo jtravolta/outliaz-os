@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["TAXONOMY.md"],
+  "references": {
+    "build-spec": {
+      "path": ".",
+      "description": "Outbound OS spec files: BUILD-PLAN.md (full plan, sections A–D), ONE-SHOT-BUILD-PROMPT.md (paste-ready agent spec), TAXONOMY.md (canonical enums, gates, transition matrix — auto-loaded as instructions). Read BUILD-PLAN.md before any architecture or schema work."
+    }
+  }
+}

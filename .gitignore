@@ -1,0 +1,29 @@
+# Secrets and local environment
+.env*
+!.env.example
+
+# Dependencies, build output and local database
+node_modules/
+.next/
+.pgdata/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local skills and agent workspaces
+.agents/
+.worktrees/
+.superpowers/
+.taste-skill/
+
+# Private data, backups and test artifacts
+backups/
+*.dump
+*.backup
+*.sql.gz
+dataset_*.json
+hvac-businesses-in-the-us.json
+playwright-report/
+test-results/
+coverage/
+*.log
+.DS_Store

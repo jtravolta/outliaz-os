@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Outbound OS — light build</title>
+<style>
+  :root{
+    --bg:#fafafa; --panel:#ffffff; --panel-2:#f4f4f5; --line:#e4e4e7;
+    --text:#18181b; --text-2:#52525b; --muted:#a1a1aa;
+    --accent:#7c3aed; --accent-soft:#f3e8ff; --accent-line:#ddd6fe;
+    --ok:#15803d; --ok-soft:#dcfce7; --warn:#b45309; --warn-soft:#fef3c7;
+    --bad:#b91c1c; --bad-soft:#fee2e2; --info:#1d4ed8; --info-soft:#dbeafe;
+    --shadow:0 1px 2px rgba(0,0,0,.05), 0 8px 24px -12px rgba(0,0,0,.18);
+    --r:10px;
+  }
+  html[data-theme="dark"]{
+    --bg:#09090b; --panel:#111113; --panel-2:#18181b; --line:#27272a;
+    --text:#fafafa; --text-2:#d4d4d8; --muted:#71717a;
+    --accent:#8b5cf6; --accent-soft:#2e1065; --accent-line:#4c1d95;
+    --ok:#4ade80; --ok-soft:#052e16; --warn:#fbbf24; --warn-soft:#3f2d05;
+    --bad:#f87171; --bad-soft:#450a0a; --info:#93c5fd; --info-soft:#0b2545;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 32px -16px rgba(0,0,0,.8);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select,textarea{font:inherit;color:inherit}
+  button{cursor:pointer;background:none;border:0}
+  a{color:inherit}
+  .wrap{max-width:1440px;margin:0 auto;padding:0 20px 64px}
+
+  /* ---------- top bar ---------- */
+  header.top{
+    position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  }
+  .top-in{max-width:1440px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:-.01em}
+  .logo{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
+  .ws{color:var(--muted);font-size:12.5px;padding-left:12px;border-left:1px solid var(--line)}
+  .spacer{flex:1}
+  .icon-btn{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;border:1px solid transparent;color:var(--text-2)}
+  .icon-btn:hover{background:var(--panel-2);border-color:var(--line)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line);display:grid;place-items:center;font-size:11.5px;font-weight:700}
+
+  /* ---------- headings ---------- */
+  .h1{font-size:22px;font-weight:650;letter-spacing:-.02em;margin:26px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+
+  /* ---------- kpis ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)}
+  .kpi .k{font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .kpi .v{font-size:24px;font-weight:650;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+  .kpi .d{font-size:11.5px;color:var(--muted)}
+  .kpi.alert .v{color:var(--bad)}
+
+  /* ---------- pipeline ---------- */
+  .pipe{display:flex;gap:6px;overflow-x:auto;padding:4px 0 6px;margin-bottom:14px;scrollbar-width:thin}
+  .pstep{
+    min-width:104px;flex:1;text-align:left;padding:9px 11px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel);color:var(--text-2);
+    transition:border-color .12s, background .12s;
+  }
+  .pstep:hover{border-color:var(--accent-line)}
+  .pstep[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--text)}
+  .pstep .pl{font-size:11.5px;font-weight:600;white-space:nowrap}
+  .pstep .pv{font-size:17px;font-weight:650;margin-top:1px;font-variant-numeric:tabular-nums}
+
+  /* ---------- toolbar ---------- */
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .field{position:relative;display:flex;align-items:center}
+  .bar select{width:auto;min-width:132px;max-width:190px}
+  .bar .btn{flex:none}
+  .field svg{position:absolute;left:9px;color:var(--muted);pointer-events:none}
+  input[type=search],select,input[type=text],input[type=email],input[type=date],input[type=number],textarea{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none;
+    color:var(--text);transition:border-color .12s,box-shadow .12s;width:100%;
+  }
+  input[type=search]{padding-left:30px;min-width:230px}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+  select{appearance:none;padding-right:26px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 9px center}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 11px;font-weight:550;font-size:13px;white-space:nowrap}
+  .btn:hover{background:var(--panel-2)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.ghost{border-color:transparent}
+  .btn.sm{padding:4px 8px;font-size:12px;border-radius:7px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .count{color:var(--muted);font-size:12.5px;margin-left:auto;white-space:nowrap}
+
+  /* ---------- table ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+  .tscroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:1020px}
+  th{
+    text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+    font-weight:600;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel-2);white-space:nowrap;
+  }
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel-2)}
+  tbody tr:last-child td{border-bottom:0}
+  .biz{font-weight:600;letter-spacing:-.01em}
+  .dom{color:var(--muted);font-size:12px}
+  .loc{font-size:12.5px;color:var(--text-2);white-space:nowrap}
+  .muted{color:var(--muted)}
+  .nowrap{white-space:nowrap}
+
+  /* ---------- pills ---------- */
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+  .pill.grey{background:var(--panel-2);color:var(--text-2);border-color:var(--line)}
+  .pill.violet{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+  .pill.green{background:var(--ok-soft);color:var(--ok)}
+  .pill.amber{background:var(--warn-soft);color:var(--warn)}
+  .pill.red{background:var(--bad-soft);color:var(--bad)}
+  .pill.blue{background:var(--info-soft);color:var(--info)}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+  .chips{display:flex;flex-wrap:wrap;gap:4px}
+
+  /* ---------- drawer ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:50;opacity:0;pointer-events:none;transition:opacity .16s}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{
+    position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:var(--panel);
+    border-left:1px solid var(--line);z-index:60;transform:translateX(100%);transition:transform .18s ease;
+    display:flex;flex-direction:column;box-shadow:-24px 0 60px -30px rgba(0,0,0,.5);
+  }
+  .drawer.on{transform:none}
+  .dhead{display:flex;gap:10px;align-items:flex-start;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .dbody{overflow:auto;padding:16px 18px 28px;flex:1}
+  .dfoot{border-top:1px solid var(--line);padding:12px 18px;display:flex;gap:8px;flex-wrap:wrap;background:var(--panel)}
+  .sec{margin-bottom:22px}
+  .sec h3{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px;font-weight:650}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0}
+  .check{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px}
+  .tick{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none}
+  .tick.y{background:var(--ok-soft);color:var(--ok)}
+  .tick.n{background:var(--bad-soft);color:var(--bad)}
+  .trans{display:flex;flex-wrap:wrap;gap:6px}
+  .tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:1px solid var(--line)}
+  .tl li{position:relative;padding:0 0 12px 12px;font-size:12.5px;color:var(--text-2)}
+  .tl li::before{content:"";position:absolute;left:-18px;top:5px;width:7px;height:7px;border-radius:50%;background:var(--accent-line);border:1px solid var(--accent)}
+  .tl time{display:block;color:var(--muted);font-size:11px}
+
+  /* ---------- modal ---------- */
+  .modal{position:fixed;inset:0;z-index:70;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+  .modal.on{display:flex}
+  .sheet{width:min(720px,100%);background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .sheet header{display:flex;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .sheet .body{padding:18px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  label.lbl{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .toggle{display:flex;flex-wrap:wrap;gap:6px}
+  .toggle button{
+    border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--text-2);
+  }
+  .toggle button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+  /* ---------- toast ---------- */
+  .toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center}
+  .toast{background:var(--text);color:var(--bg);border-radius:9px;padding:9px 14px;font-size:13px;box-shadow:var(--shadow);max-width:520px}
+  .toast.bad{background:var(--bad);color:#fff}
+
+  .empty{padding:56px 20px;text-align:center;color:var(--muted)}
+  .empty b{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
+  @media (max-width:900px){
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .grid3{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:600px){
+    .grid2,.grid3{grid-template-columns:1fr}
+    .h1{font-size:19px}
+    .ws{display:none}
+    input[type=search]{min-width:0}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><span class="logo">O</span> Outbound OS</div>
+    <span class="ws">Acme Studio · 3 seats</span>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+    <button class="icon-btn" id="resetBtn" title="Reset demo data" aria-label="Reset demo data">⟲</button>
+    <div class="avatar" title="You · OWNER">SW</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 class="h1">Prospects</h1>
+  <p class="sub">Sourced, classified, gated, and worked — one record per company.</p>
+
+  <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+  <section class="pipe" id="pipeline" aria-label="Pipeline stages"></section>
+
+  <div class="bar">
+    <div class="field">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="q" placeholder="Search business, domain, contact…" aria-label="Search prospects" />
+    </div>
+    <select id="fIndustry" aria-label="Industry"></select>
+    <select id="fFit" aria-label="Fit"></select>
+    <select id="fPriority" aria-label="Priority"></select>
+    <select id="fGate" aria-label="Gate readiness">
+      <option value="">Any gate state</option>
+      <option value="research">Ready to research</option>
+      <option value="qualification">Ready to qualify</option>
+      <option value="blocked">Blocked at a gate</option>
+    </select>
+    <button class="btn" id="clearBtn">Clear</button>
+    <span class="spacer"></span>
+    <button class="btn" id="exportBtn">Export CSV</button>
+    <button class="btn primary" id="addBtn">+ Add prospect</button>
+  </div>
+
+  <div class="bar" style="margin-top:-2px">
+    <span class="count" id="count" style="margin-left:0"></span>
+    <span class="spacer"></span>
+    <span class="count" id="saved"></span>
+  </div>
+
+  <div class="card">
+    <div class="tscroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:210px">Business</th>
+            <th>Classification</th>
+            <th>Location</th>
+            <th>Size</th>
+            <th>Stage</th>
+            <th>Fit / Priority</th>
+            <th>Contact</th>
+            <th>Next action</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden>
+      <b>No prospects match</b>
+      Loosen a filter, or add the first one.
+    </div>
+  </div>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Prospect detail" aria-hidden="true"></aside>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Add prospect"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Taxonomy (mirrors TAXONOMY.md)
+   ============================================================ */
+const INDUSTRIES = [
+  ['PROFESSIONAL_SERVICES','Professional Services'],['HEALTHCARE','Healthcare'],['HOME_SERVICES','Home Services'],
+  ['CONSTRUCTION_TRADES','Construction & Trades'],['PROPERTY_REAL_ESTATE','Property & Real Estate'],
+  ['HOSPITALITY_FOOD','Hospitality & Food'],['BEAUTY_WELLNESS','Beauty & Wellness'],['RETAIL_ECOMMERCE','Retail & E-commerce'],
+  ['AUTOMOTIVE','Automotive'],['EDUCATION_TRAINING','Education & Training'],['TECHNOLOGY','Technology'],
+  ['FINANCE_INSURANCE','Finance & Insurance'],['CREATIVE_MEDIA','Creative & Media'],['TRAVEL_TOURISM','Travel & Tourism'],
+  ['AGRICULTURE','Agriculture'],['MANUFACTURING','Manufacturing'],['OTHER','Other']
+].map(([slug,label])=>({slug,label}));
+
+const TYPES = {
+  PROFESSIONAL_SERVICES:['Law Firm','Accounting Firm','Consultancy','Recruitment Agency'],
+  HEALTHCARE:['Dentist','Physiotherapy Clinic','Medical Clinic','Optician','Private Practice'],
+  HOME_SERVICES:['Plumbing Company','Electrical Contractor','Cleaning Company','Landscaper','Pest Control'],
+  CONSTRUCTION_TRADES:['Building Contractor','Roofer','Renovation Company','Groundworks'],
+  PROPERTY_REAL_ESTATE:['Estate Agency','Property Manager','Property Developer'],
+  HOSPITALITY_FOOD:['Restaurant','Café','Hotel','Catering Company'],
+  BEAUTY_WELLNESS:['Hair Salon','Barber Shop','Spa','Gym','Wellness Centre'],
+  RETAIL_ECOMMERCE:['Retail Store','Boutique','Online Shop'],
+  AUTOMOTIVE:['Auto Repair Shop','Car Dealership','Detailing Studio','Car Rental'],
+  EDUCATION_TRAINING:['Training Company','Tutoring Service','Academy','School'],
+  TECHNOLOGY:['SaaS Company','IT Services','Software Company'],
+  FINANCE_INSURANCE:['Financial Adviser','Insurance Broker','Insurance Company'],
+  CREATIVE_MEDIA:['Marketing Agency','Design Studio','Photography Studio','Production Company'],
+  TRAVEL_TOURISM:['Tour Operator','Travel Agency','Accommodation Provider'],
+  AGRICULTURE:['Farm','Agricultural Services','Agricultural Supplier','Food Processor'],
+  MANUFACTURING:['Manufacturer','Fabricator','Industrial Supplier'],
+  OTHER:['Other']
+};
+
+const SIZES = [
+  ['SOLO','Solo','1'],['MICRO','Micro','2–5'],['SMALL','Small','6–20'],
+  ['SMALL_MEDIUM','Small–Medium','21–50'],['MEDIUM','Medium','51–200'],['LARGE','Large','201+'],['UNKNOWN','Unknown','—']
+];
+const OPPORTUNITIES = [
+  ['NO_WEBSITE','No website'],['OUTDATED_WEBSITE','Outdated website'],['POOR_MOBILE_EXPERIENCE','Poor mobile experience'],
+  ['POOR_USER_EXPERIENCE','Poor user experience'],['WEAK_BRANDING','Weak branding'],['WEAK_CONVERSION','Weak conversion'],
+  ['NO_LEAD_CAPTURE','No lead capture'],['NO_ONLINE_BOOKING','No online booking'],['ECOMMERCE_OPPORTUNITY','E-commerce opportunity'],
+  ['NEEDS_AUTOMATION','Needs automation'],['NEEDS_WEB_APPLICATION','Needs web application'],
+  ['WEBSITE_PERFORMANCE','Website performance'],['SEO_DISCOVERABILITY','SEO discoverability'],['UNKNOWN','Unknown']
+];
+const SERVICES = [
+  ['WEBSITE_DESIGN','Website design'],['WEBSITE_REDESIGN','Website redesign'],['WEBSITE_DEVELOPMENT','Website development'],
+  ['LANDING_PAGE','Landing page'],['ECOMMERCE','E-commerce'],['BRAND_IDENTITY','Brand identity'],['BRAND_REFRESH','Brand refresh'],
+  ['UI_UX_DESIGN','UI/UX design'],['WEB_APPLICATION','Web application'],['BOOKING_SYSTEM','Booking system'],
+  ['LEAD_GENERATION_SYSTEM','Lead generation system'],['BUSINESS_AUTOMATION','Business automation'],
+  ['WEBSITE_OPTIMISATION','Website optimisation'],['ONGOING_SUPPORT','Ongoing support'],['OTHER','Other']
+];
+const ROLES = [
+  ['OWNER','Owner'],['FOUNDER','Founder'],['MANAGING_DIRECTOR','Managing Director'],['CEO','CEO'],
+  ['MARKETING_DIRECTOR','Marketing Director'],['MARKETING_MANAGER','Marketing Manager'],
+  ['OPERATIONS_DIRECTOR','Operations Director'],['OPERATIONS_MANAGER','Operations Manager'],
+  ['GENERAL_MANAGER','General Manager'],['OTHER_DECISION_MAKER','Other decision maker']
+];
+const STAGES = [
+  ['NEW','New'],['RESEARCHED','Researched'],['QUALIFIED','Qualified'],['CONTACTED','Contacted'],
+  ['FOLLOW_UP','Follow-up'],['REPLIED','Replied'],['MEETING','Meeting'],['PROPOSAL','Proposal'],
+  ['WON','Won'],['LOST','Lost'],['DISQUALIFIED','Disqualified']
+];
+const FITS = [['STRONG','Strong'],['GOOD','Good'],['POSSIBLE','Possible'],['POOR','Poor'],['UNKNOWN','Unknown']];
+const PRIORITIES = [['HIGH','High'],['MEDIUM','Medium'],['LOW','Low'],['DISQUALIFIED','Disqualified']];
+const CONTACTABILITY = [['OK','OK'],['BOUNCED','Bounced'],['UNSUBSCRIBED','Unsubscribed'],['DO_NOT_CONTACT','Do not contact']];
+const QUALITY = [['VERIFIED','Verified'],['UNVERIFIED','Unverified'],['RISKY','Risky'],['BOUNCED','Bounced'],['UNKNOWN','Unknown']];
+
+const MATRIX = {
+  NEW:['RESEARCHED','DISQUALIFIED'],
+  RESEARCHED:['QUALIFIED','NEW','LOST','DISQUALIFIED'],
+  QUALIFIED:['CONTACTED','RESEARCHED','NEW','MEETING','LOST','DISQUALIFIED'],
+  CONTACTED:['FOLLOW_UP','REPLIED','MEETING','PROPOSAL','LOST','DISQUALIFIED'],
+  FOLLOW_UP:['REPLIED','MEETING','PROPOSAL','LOST','DISQUALIFIED'],
+  REPLIED:['CONTACTED','MEETING','PROPOSAL','LOST','DISQUALIFIED'],
+  MEETING:['PROPOSAL','WON','LOST','DISQUALIFIED'],
+  PROPOSAL:['WON','LOST','DISQUALIFIED'],
+  WON:[], LOST:['RESEARCHED'], DISQUALIFIED:['NEW']
+};
+const SUGGEST = {
+  NO_WEBSITE:['WEBSITE_DESIGN'], OUTDATED_WEBSITE:['WEBSITE_REDESIGN'],
+  POOR_MOBILE_EXPERIENCE:['WEBSITE_REDESIGN','WEBSITE_OPTIMISATION'], POOR_USER_EXPERIENCE:['UI_UX_DESIGN'],
+  WEAK_BRANDING:['BRAND_IDENTITY','BRAND_REFRESH'], WEAK_CONVERSION:['LANDING_PAGE','WEBSITE_OPTIMISATION'],
+  NO_LEAD_CAPTURE:['LEAD_GENERATION_SYSTEM'], NO_ONLINE_BOOKING:['BOOKING_SYSTEM'],
+  ECOMMERCE_OPPORTUNITY:['ECOMMERCE'], NEEDS_AUTOMATION:['BUSINESS_AUTOMATION'],
+  NEEDS_WEB_APPLICATION:['WEB_APPLICATION'], WEBSITE_PERFORMANCE:['WEBSITE_OPTIMISATION'],
+  SEO_DISCOVERABILITY:['WEBSITE_OPTIMISATION']
+};
+
+const labelOf = (list,slug) => (list.find(x=>x[0]===slug)||[slug,slug])[1];
+const L = {
+  stage:s=>labelOf(STAGES,s), fit:s=>labelOf(FITS,s), priority:s=>labelOf(PRIORITIES,s),
+  industry:s=>labelOf(INDUSTRIES.map(i=>[i.slug,i.label]),s),
+  size:s=>labelOf(SIZES,s), opp:s=>labelOf(OPPORTUNITIES,s), svc:s=>labelOf(SERVICES,s),
+  role:s=>labelOf(ROLES,s), quality:s=>labelOf(QUALITY,s), contactability:s=>labelOf(CONTACTABILITY,s)
+};
+
+/* ============================================================
+   Seed data
+   ============================================================ */
+const today = new Date();
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+const day = n => iso(new Date(today.getTime()+n*86400000));
+
+function seed(){
+  const mk = (o) => ({
+    id: crypto.randomUUID(), stage:'NEW', fit:'UNKNOWN', priority:'MEDIUM', contactability:'OK',
+    contactQuality:'UNKNOWN', opportunities:[], services:[], tags:[], notes:[], events:[],
+    employees:null, size:'UNKNOWN', createdAt:new Date().toISOString(), closedReason:'', ...o
+  });
+  return [
+    mk({ business:'Harper & Vale Dental', domain:'harpervale.co.uk', industry:'HEALTHCARE', type:'Dentist',
+      city:'Manchester', region:'Greater Manchester', country:'GB', market:'UK', employees:14, size:'SMALL',
+      stage:'QUALIFIED', fit:'STRONG', priority:'HIGH', opportunities:['OUTDATED_WEBSITE','NO_ONLINE_BOOKING'],
+      services:['WEBSITE_REDESIGN','BOOKING_SYSTEM'], contactName:'Dr Ellie Harper', role:'OWNER',
+      email:'ellie@harpervale.co.uk', phone:'0161 496 0121', contactQuality:'VERIFIED',
+      nextAction:'Send step 1 — redesign + booking angle', followUpDate:day(1), owner:'SW',
+      tags:['warm','Q4'], source:'Apify · Google Maps UK',
+      events:[{at:new Date(Date.now()-86400000*6).toISOString(),text:'Sourced via Apify (Google Maps UK)'},
+              {at:new Date(Date.now()-86400000*4).toISOString(),text:'Research gate passed → Researched'},
+              {at:new Date(Date.now()-86400000*3).toISOString(),text:'Qualified by rule “Dental + no booking”'}] }),
+
+    mk({ business:'Northline Roofing', domain:'northlineroofing.com', industry:'CONSTRUCTION_TRADES', type:'Roofer',
+      city:'Leeds', region:'West Yorkshire', country:'GB', market:'UK', employees:9, size:'SMALL',
+      stage:'CONTACTED', fit:'GOOD', priority:'HIGH', opportunities:['NO_WEBSITE','WEAK_BRANDING'],
+      services:['WEBSITE_DESIGN','BRAND_IDENTITY'], contactName:'Marek Nowak', role:'FOUNDER',
+      email:'marek@northlineroofing.com', contactQuality:'VERIFIED', contactability:'OK',
+      lastContactedAt:day(-2), nextAction:'Follow-up 1 (day 3)', followUpDate:day(1), owner:'SW', tags:['north'],
+      source:'CSV import · 2026-10-12',
+      events:[{at:new Date(Date.now()-86400000*9).toISOString(),text:'Imported from CSV (batch #12)'},
+              {at:new Date(Date.now()-86400000*2).toISOString(),text:'Step 1 sent — opened 3×'}] }),
+
+    mk({ business:'Café Lumen', domain:'cafelumen.nl', industry:'HOSPITALITY_FOOD', type:'Café',
+      city:'Utrecht', region:'Utrecht', country:'NL', market:'Benelux', employees:6, size:'SMALL',
+      stage:'FOLLOW_UP', fit:'GOOD', priority:'MEDIUM', opportunities:['WEAK_CONVERSION','NO_LEAD_CAPTURE'],
+      services:['LANDING_PAGE','LEAD_GENERATION_SYSTEM'], contactName:'Sanne de Vries', role:'OWNER',
+      email:'sanne@cafelumen.nl', contactQuality:'UNVERIFIED',
+      lastContactedAt:day(-9), nextAction:'Follow-up 2 — send case study', followUpDate:day(-3), owner:'SW',
+      tags:['benelux'], source:'Apify · Google Maps NL',
+      events:[{at:new Date(Date.now()-86400000*15).toISOString(),text:'Sourced via Apify (Google Maps NL)'},
+              {at:new Date(Date.now()-86400000*9).toISOString(),text:'Step 1 sent · step 2 sent'}] }),
+
+    mk({ business:'Blake Legal', domain:'blakelegal.co.uk', industry:'PROFESSIONAL_SERVICES', type:'Law Firm',
+      city:'Bristol', region:'South West', country:'GB', market:'UK', employees:32, size:'SMALL_MEDIUM',
+      stage:'REPLIED', fit:'STRONG', priority:'HIGH', opportunities:['POOR_USER_EXPERIENCE','SEO_DISCOVERABILITY'],
+      services:['UI_UX_DESIGN','WEBSITE_OPTIMISATION'], contactName:'Amelia Blake', role:'MANAGING_DIRECTOR',
+      email:'amelia@blakelegal.co.uk', contactQuality:'VERIFIED', contactability:'OK',
+      lastContactedAt:day(-4), lastReplyAt:day(-1),
+      nextAction:'Reply — offer 20-min site audit', followUpDate:day(0), owner:'SW', tags:['hot'],
+      source:'Referral',
+      events:[{at:new Date(Date.now()-86400000*11).toISOString(),text:'Created manually (referral)'},
+              {at:new Date(Date.now()-86400000*1).toISOString(),text:'Reply received → sequence stopped, stage Replied'}] }),
+
+    mk({ business:'Summit Physio', domain:'summitphysio.ie', industry:'HEALTHCARE', type:'Physiotherapy Clinic',
+      city:'Dublin', region:'Leinster', country:'IE', market:'IE', employees:11, size:'SMALL',
+      stage:'RESEARCHED', fit:'POSSIBLE', priority:'MEDIUM', opportunities:['POOR_MOBILE_EXPERIENCE'],
+      services:[], contactName:'Cian Murphy', role:'OWNER', email:'cian@summitphysio.ie',
+      contactQuality:'UNVERIFIED', nextAction:'Confirm services + budget signal', followUpDate:day(2), owner:'SW',
+      tags:[], source:'Apify · Google Maps IE',
+      events:[{at:new Date(Date.now()-86400000*5).toISOString(),text:'Research gate passed → Researched'}] }),
+
+    mk({ business:'Petal & Stone Salon', domain:'petalandstone.com', industry:'BEAUTY_WELLNESS', type:'Hair Salon',
+      city:'Brighton', region:'South East', country:'GB', market:'UK', employees:7, size:'SMALL',
+      stage:'NEW', fit:'UNKNOWN', priority:'MEDIUM', opportunities:['UNKNOWN'], services:[],
+      contactName:'', role:'', email:'', contactQuality:'UNKNOWN',
+      nextAction:'', followUpDate:'', owner:'SW', tags:[], source:'Apify · Instagram UK',
+      events:[{at:new Date(Date.now()-86400000*1).toISOString(),text:'Sourced via Apify (Instagram UK)'}] }),
+
+    mk({ business:'Vantage Analytics', domain:'vantageanalytics.de', industry:'TECHNOLOGY', type:'SaaS Company',
+      city:'Berlin', region:'Berlin', country:'DE', market:'DACH', employees:64, size:'MEDIUM',
+      stage:'MEETING', fit:'STRONG', priority:'HIGH', opportunities:['NEEDS_AUTOMATION','NEEDS_WEB_APPLICATION'],
+      services:['BUSINESS_AUTOMATION','WEB_APPLICATION'], contactName:'Jonas Weber', role:'CTO',
+      email:'jonas@vantageanalytics.de', contactQuality:'VERIFIED',
+      lastContactedAt:day(-13), lastReplyAt:day(-8), nextAction:'Discovery call — Tue 14:00 CET',
+      followUpDate:day(2), owner:'SW', tags:['dach','enterprise'], source:'Referral',
+      events:[{at:new Date(Date.now()-86400000*20).toISOString(),text:'Created manually (referral)'},
+              {at:new Date(Date.now()-86400000*8).toISOString(),text:'Reply → Meeting booked'}] }),
+
+    mk({ business:'Fenwick Garden Rooms', domain:'fenwickgardenrooms.co.uk', industry:'CONSTRUCTION_TRADES', type:'Building Contractor',
+      city:'Norwich', region:'East', country:'GB', market:'UK', employees:4, size:'MICRO',
+      stage:'PROPOSAL', fit:'STRONG', priority:'HIGH', opportunities:['WEAK_CONVERSION','WEBSITE_PERFORMANCE'],
+      services:['LANDING_PAGE','WEBSITE_OPTIMISATION'], contactName:'Tom Fenwick', role:'OWNER',
+      email:'tom@fenwickgardenrooms.co.uk', contactQuality:'VERIFIED',
+      lastContactedAt:day(-18), nextAction:'Chase proposal (sent 6 days ago)', followUpDate:day(-1), owner:'SW',
+      tags:['proposal'], source:'Apify · Google Maps UK',
+      events:[{at:new Date(Date.now()-86400000*30).toISOString(),text:'Sourced via Apify'},
+              {at:new Date(Date.now()-86400000*6).toISOString(),text:'Proposal sent — £4,200'}] }),
+
+    mk({ business:'Larkfield Academy', domain:'larkfield.ac.uk', industry:'EDUCATION_TRAINING', type:'Academy',
+      city:'Nottingham', region:'East Midlands', country:'GB', market:'UK', employees:120, size:'MEDIUM',
+      stage:'WON', fit:'STRONG', priority:'HIGH', opportunities:['POOR_USER_EXPERIENCE'],
+      services:['WEBSITE_REDESIGN'], contactName:'Priya Shah', role:'OPERATIONS_DIRECTOR',
+      email:'priya@larkfield.ac.uk', contactQuality:'VERIFIED',
+      nextAction:'Handover to delivery', followUpDate:day(7), owner:'SW', tags:['client'],
+      source:'Referral', closedReason:'',
+      events:[{at:new Date(Date.now()-86400000*60).toISOString(),text:'Created manually'},
+              {at:new Date(Date.now()-86400000*2).toISOString(),text:'Stage → Won · £9,800'}] }),
+
+    mk({ business:'Ironbridge Motors', domain:'ironbridgemotors.co.uk', industry:'AUTOMOTIVE', type:'Auto Repair Shop',
+      city:'Telford', region:'West Midlands', country:'GB', market:'UK', employees:18, size:'SMALL',
+      stage:'LOST', fit:'POOR', priority:'LOW', opportunities:['UNKNOWN'], services:[],
+      contactName:'Dave Pritchard', role:'OWNER', email:'dave@ironbridgemotors.co.uk',
+      contactQuality:'UNVERIFIED', contactability:'BOUNCED', closedReason:'Hard bounce, no working address',
+      nextAction:'', followUpDate:'', owner:'SW', tags:[], source:'CSV import · 2026-10-12',
+      events:[{at:new Date(Date.now()-86400000*22).toISOString(),text:'Imported from CSV'},
+              {at:new Date(Date.now()-86400000*12).toISOString(),text:'Bounce → contactability BOUNCED'},
+              {at:new Date(Date.now()-86400000*12).toISOString(),text:'Stage → Lost (hard bounce)'}] }),
+
+    mk({ business:'Copper Kettle Catering', domain:'copperkettle.co.uk', industry:'HOSPITALITY_FOOD', type:'Catering Company',
+      city:'Glasgow', region:'Scotland', country:'GB', market:'UK', employees:23, size:'SMALL_MEDIUM',
+      stage:'NEW', fit:'UNKNOWN', priority:'LOW', opportunities:['UNKNOWN'], services:[],
+      contactName:'', role:'', email:'', contactQuality:'UNKNOWN',
+      nextAction:'', followUpDate:'', owner:'SW', tags:[], source:'Apify · Google Maps UK',
+      events:[{at:new Date(Date.now()-86400000*3).toISOString(),text:'Sourced via Apify (Google Maps UK)'}] }),
+
+    mk({ business:'Aster Design Studio', domain:'asterdesign.io', industry:'CREATIVE_MEDIA', type:'Design Studio',
+      city:'Rotterdam', region:'South Holland', country:'NL', market:'Benelux', employees:3, size:'MICRO',
+      stage:'DISQUALIFIED', fit:'POOR', priority:'DISQUALIFIED', opportunities:['UNKNOWN'], services:[],
+      contactName:'Lotte Bakker', role:'FOUNDER', email:'lotte@asterdesign.io', contactQuality:'UNKNOWN',
+      closedReason:'In-house design team — no fit', nextAction:'', followUpDate:'', owner:'SW',
+      tags:[], source:'Apify · Instagram NL',
+      events:[{at:new Date(Date.now()-86400000*8).toISOString(),text:'Stage → Disqualified (priority set)'}] }),
+
+    mk({ business:'Marlow & Finch Accounting', domain:'marlowfinch.co.uk', industry:'PROFESSIONAL_SERVICES', type:'Accounting Firm',
+      city:'Reading', region:'South East', country:'GB', market:'UK', employees:16, size:'SMALL',
+      stage:'CONTACTED', fit:'GOOD', priority:'MEDIUM', opportunities:['NO_LEAD_CAPTURE','OUTDATED_WEBSITE'],
+      services:['LEAD_GENERATION_SYSTEM','WEBSITE_REDESIGN'], contactName:'Helen Finch', role:'MANAGING_DIRECTOR',
+      email:'helen@marlowfinch.co.uk', contactQuality:'VERIFIED',
+      lastContactedAt:day(-6), nextAction:'Follow-up 2 (day 7)', followUpDate:day(0), owner:'SW',
+      tags:['south'], source:'CSV import · 2026-10-12',
+      events:[{at:new Date(Date.now()-86400000*6).toISOString(),text:'Step 1 sent'}] }),
+
+    mk({ business:'Tarn Valley Vets', domain:'tarnvalleyvets.co.uk', industry:'HEALTHCARE', type:'Private Practice',
+      city:'Kendal', region:'North West', country:'GB', market:'UK', employees:26, size:'SMALL_MEDIUM',
+      stage:'RESEARCHED', fit:'GOOD', priority:'HIGH', opportunities:['NO_ONLINE_BOOKING','POOR_MOBILE_EXPERIENCE'],
+      services:['BOOKING_SYSTEM','WEBSITE_REDESIGN'], contactName:'Dr Ruth Ainsley', role:'OWNER',
+      email:'ruth@tarnvalleyvets.co.uk', contactQuality:'UNVERIFIED',
+      nextAction:'Qualify — check service fit', followUpDate:day(1), owner:'SW', tags:[], source:'Apify · Google Maps UK',
+      events:[{at:new Date(Date.now()-86400000*4).toISOString(),text:'Research gate passed → Researched'}] })
+  ];
+}
+
+/* ============================================================
+   State
+   ============================================================ */
+const KEY = 'outbound-os.light.v1';
+let db = load();
+let ui = { q:'', industry:'', stage:'', fit:'', priority:'', gate:'', openId:null, pendingClose:null, draft:null };
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const p = JSON.parse(raw); if(Array.isArray(p) && p.length) return p; }
+  }catch(e){}
+  const s = seed(); save(s); return s;
+}
+function save(data=db){ try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} }
+
+/* ============================================================
+   Gates
+   ============================================================ */
+function researchMissing(p){
+  const m=[];
+  if(!p.industry) m.push('Industry');
+  if(!p.type) m.push('Business type');
+  if(!p.size || p.size==='UNKNOWN') m.push('Company size');
+  if(!p.opportunities.length || p.opportunities.every(o=>o==='UNKNOWN')) m.push('At least one real opportunity');
+  if(!p.fit || p.fit==='UNKNOWN') m.push('Fit');
+  if(!p.country) m.push('Country');
+  if(!p.contactName) m.push('Contact name');
+  if(!p.role) m.push('Contact role');
+  return m;
+}
+function qualificationMissing(p){
+  const m = researchMissing(p).slice();
+  if(!['STRONG','GOOD'].includes(p.fit)) m.push('Fit must be Strong or Good');
+  if(!p.services.length) m.push('At least one potential service');
+  if(!['HIGH','MEDIUM'].includes(p.priority)) m.push('Priority High or Medium');
+  if(!p.email) m.push('Contact email');
+  if(p.contactQuality==='BOUNCED') m.push('Contact quality is Bounced');
+  if(p.contactability!=='OK') m.push('Contactability must be OK');
+  return [...new Set(m)];
+}
+function enrollmentMissing(p){
+  const m=[];
+  if(!['QUALIFIED','CONTACTED','FOLLOW_UP'].includes(p.stage)) m.push('Stage Qualified/Contacted/Follow-up');
+  if(['LOW','DISQUALIFIED'].includes(p.priority)) m.push('Priority not Low/Disqualified');
+  if(['POOR','UNKNOWN'].includes(p.fit)) m.push('Fit not Poor/Unknown');
+  if(!p.email) m.push('Email');
+  if(p.contactability!=='OK') m.push('Contactability OK');
+  return m;
+}
+function gateState(p){
+  if(p.stage==='NEW' && researchMissing(p).length===0) return 'research-ready';
+  if(p.stage==='RESEARCHED' && qualificationMissing(p).length===0) return 'qualification-ready';
+  if(['NEW','RESEARCHED'].includes(p.stage)) return 'blocked';
+  return 'working';
+}
+
+/* ============================================================
+   Rendering helpers
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stageTone = s => ({NEW:'grey',RESEARCHED:'blue',QUALIFIED:'violet',CONTACTED:'blue',FOLLOW_UP:'amber',
+  REPLIED:'green',MEETING:'green',PROPOSAL:'violet',WON:'green',LOST:'grey',DISQUALIFIED:'red'}[s]||'grey');
+const fitTone = f => ({STRONG:'green',GOOD:'blue',POSSIBLE:'amber',POOR:'red',UNKNOWN:'grey'}[f]||'grey');
+const priTone = p => ({HIGH:'violet',MEDIUM:'grey',LOW:'grey',DISQUALIFIED:'red'}[p]||'grey');
+const dueStatus = p => {
+  if(!p.followUpDate) return null;
+  const d = new Date(p.followUpDate+'T00:00:00'), t = new Date(iso(today)+'T00:00:00');
+  const diff = Math.round((d-t)/86400000);
+  if(diff<0) return {label:`Overdue ${Math.abs(diff)}d`, tone:'red'};
+  if(diff===0) return {label:'Due today', tone:'amber'};
+  if(diff<=2) return {label:`Due in ${diff}d`, tone:'amber'};
+  return {label:p.followUpDate, tone:'grey'};
+};
+
+function filtered(){
+  const q = ui.q.trim().toLowerCase();
+  return db.filter(p=>{
+    if(ui.stage && p.stage!==ui.stage) return false;
+    if(ui.industry && p.industry!==ui.industry) return false;
+    if(ui.fit && p.fit!==ui.fit) return false;
+    if(ui.priority && p.priority!==ui.priority) return false;
+    if(ui.gate){
+      const g = gateState(p);
+      if(ui.gate==='blocked' ? g!=='blocked' : g!==ui.gate) return false;
+    }
+    if(q){
+      const hay = [p.business,p.domain,p.contactName,p.email,p.city,p.type,L.industry(p.industry),p.tags.join(' ')]
+        .join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function countByStage(){
+  const c={}; STAGES.forEach(([s])=>c[s]=0); db.forEach(p=>c[p.stage]=(c[p.stage]||0)+1); return c;
+}
+
+function renderKpis(){
+  const open = db.filter(p=>!['WON','LOST','DISQUALIFIED'].includes(p.stage)).length;
+  const qualified = db.filter(p=>['QUALIFIED','CONTACTED','FOLLOW_UP','REPLIED','MEETING','PROPOSAL'].includes(p.stage)).length;
+  const working = db.filter(p=>['CONTACTED','FOLLOW_UP'].includes(p.stage)).length;
+  const overdue = db.filter(p=>dueStatus(p)?.tone==='red').length;
+  const contacted = db.filter(p=>p.lastContactedAt).length;
+  const replied = db.filter(p=>p.lastReplyAt).length;
+  const rate = contacted ? Math.round(replied/contacted*100) : 0;
+  const k = [
+    ['Open prospects', open, 'excludes closed'],
+    ['In pipeline', qualified, 'qualified and beyond'],
+    ['Working now', working, 'contacted / follow-up'],
+    ['Follow-ups overdue', overdue, overdue?'needs attention':'all clear', overdue>0],
+    ['Reply rate', rate+'%', `${replied} of ${contacted} contacted`]
+  ];
+  $('#kpis').innerHTML = k.map(([label,val,desc,alert])=>`
+    <div class="kpi${alert?' alert':''}">
+      <div class="k">${esc(label)}</div>
+      <div class="v">${esc(val)}</div>
+      <div class="d">${esc(desc)}</div>
+    </div>`).join('');
+}
+
+function renderPipeline(){
+  const c = countByStage();
+  $('#pipeline').innerHTML = STAGES.map(([slug,label])=>`
+    <button class="pstep" data-stage="${slug}" aria-pressed="${ui.stage===slug}">
+      <div class="pl">${esc(label)}</div>
+      <div class="pv">${c[slug]||0}</div>
+    </button>`).join('');
+  $('#pipeline').querySelectorAll('[data-stage]').forEach(el=>{
+    el.onclick = ()=>{ ui.stage = ui.stage===el.dataset.stage ? '' : el.dataset.stage; render(); };
+  });
+}
+
+function renderFilters(){
+  const ind = $('#fIndustry');
+  if(!ind.dataset.init){
+    ind.innerHTML = '<option value="">All industries</option>' +
+      INDUSTRIES.map(i=>`<option value="${i.slug}">${esc(i.label)}</option>`).join('');
+    ind.dataset.init='1';
+  }
+  const fit = $('#fFit');
+  if(!fit.dataset.init){
+    fit.innerHTML = '<option value="">Any fit</option>'+FITS.map(([s,l])=>`<option value="${s}">${esc(l)}</option>`).join('');
+    fit.dataset.init='1';
+  }
+  const pri = $('#fPriority');
+  if(!pri.dataset.init){
+    pri.innerHTML = '<option value="">Any priority</option>'+PRIORITIES.map(([s,l])=>`<option value="${s}">${esc(l)}</option>`).join('');
+    pri.dataset.init='1';
+  }
+  ind.value = ui.industry; fit.value = ui.fit; pri.value = ui.priority; $('#fGate').value = ui.gate;
+}
+
+function renderRows(){
+  const rows = filtered();
+  $('#count').textContent = `${rows.length} of ${db.length} prospects`;
+  $('#empty').hidden = rows.length>0;
+  $('#rows').innerHTML = rows.map(p=>{
+    const due = dueStatus(p);
+    return `
+    <tr data-id="${p.id}">
+      <td>
+        <div class="biz">${esc(p.business)}</div>
+        <div class="dom">${esc(p.domain||'—')}</div>
+      </td>
+      <td>
+        <div style="font-size:12.5px">${esc(L.industry(p.industry))}</div>
+        <div class="dom">${esc(p.type||'—')}</div>
+      </td>
+      <td class="loc">${esc([p.city,p.country].filter(Boolean).join(', ')||'—')}<div class="dom">${esc(p.market||'')}</div></td>
+      <td class="nowrap"><span class="pill grey">${esc(L.size(p.size))}</span></td>
+      <td><span class="pill ${stageTone(p.stage)}"><span class="dot"></span>${esc(L.stage(p.stage))}</span></td>
+      <td>
+        <div class="chips" style="flex-wrap:nowrap">
+          <span class="pill ${fitTone(p.fit)}">${esc(L.fit(p.fit))}</span>
+          <span class="pill ${priTone(p.priority)}">${esc(L.priority(p.priority))}</span>
+        </div>
+      </td>
+      <td>
+        <div style="font-size:12.5px">${esc(p.contactName||'—')}</div>
+        <div class="dom">${esc(p.email||L.role(p.role)||'')}</div>
+      </td>
+      <td>
+        <div style="font-size:12.5px">${esc(p.nextAction||'—')}</div>
+        ${due?`<span class="pill ${due.tone}" style="margin-top:3px">${esc(due.label)}</span>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+  $('#rows').querySelectorAll('tr[data-id]').forEach(tr=>{
+    tr.onclick = ()=>openDrawer(tr.dataset.id);
+  });
+}
+
+function render(){ renderKpis(); renderPipeline(); renderFilters(); renderRows(); }
+
+/* ============================================================
+   Drawer
+   ============================================================ */
+function openDrawer(id){
+  ui.openId = id; ui.pendingClose = null;
+  $('#scrim').classList.add('on');
+  const d = $('#drawer'); d.classList.add('on'); d.setAttribute('aria-hidden','false');
+  renderDrawer();
+}
+function closeDrawer(){
+  ui.openId=null; ui.pendingClose=null;
+  $('#scrim').classList.remove('on');
+  const d = $('#drawer'); d.classList.remove('on'); d.setAttribute('aria-hidden','true');
+}
+function getOpen(){ return db.find(p=>p.id===ui.openId); }
+
+function checklist(p, kind){
+  const missing = kind==='research' ? researchMissing(p) : kind==='qualification' ? qualificationMissing(p) : enrollmentMissing(p);
+  const all = kind==='research'
+    ? ['Industry','Business type','Company size','At least one real opportunity','Fit','Country','Contact name','Contact role']
+    : kind==='qualification'
+    ? ['Industry','Business type','Company size','At least one real opportunity','Fit','Country','Contact name','Contact role',
+       'Fit must be Strong or Good','At least one potential service','Priority High or Medium','Contact email',
+       'Contact quality is Bounced','Contactability must be OK']
+    : ['Stage Qualified/Contacted/Follow-up','Priority not Low/Disqualified','Fit not Poor/Unknown','Email','Contactability OK'];
+  return all.map(item=>{
+    const ok = !missing.includes(item);
+    return `<div class="check"><span class="tick ${ok?'y':'n'}">${ok?'✓':'✕'}</span><span style="color:${ok?'var(--text-2)':'var(--text)'}">${esc(item)}</span></div>`;
+  }).join('');
+}
+
+function renderDrawer(){
+  const p = getOpen(); if(!p) return;
+  const due = dueStatus(p);
+  const research = researchMissing(p);
+  const qual = qualificationMissing(p);
+  const next = MATRIX[p.stage]||[];
+  const canResearch = research.length===0;
+  const canQualify = qual.length===0;
+
+  $('#drawer').innerHTML = `
+  <div class="dhead">
+    <div style="flex:1">
+      <div style="font-size:17px;font-weight:650;letter-spacing:-.01em">${esc(p.business)}</div>
+      <div class="dom">${esc(p.domain||'')} · ${esc(p.source||'manual')}</div>
+      <div class="chips" style="margin-top:8px">
+        <span class="pill ${stageTone(p.stage)}"><span class="dot"></span>${esc(L.stage(p.stage))}</span>
+        <span class="pill ${fitTone(p.fit)}">${esc(L.fit(p.fit))}</span>
+        <span class="pill ${priTone(p.priority)}">${esc(L.priority(p.priority))}</span>
+        ${p.contactability!=='OK'?`<span class="pill red">${esc(L.contactability(p.contactability))}</span>`:''}
+        ${due?`<span class="pill ${due.tone}">${esc(due.label)}</span>`:''}
+      </div>
+    </div>
+    <button class="icon-btn" id="closeD" aria-label="Close">✕</button>
+  </div>
+
+  <div class="dbody">
+    <section class="sec">
+      <h3>Classification</h3>
+      <dl class="kv">
+        <dt>Industry</dt><dd>${esc(L.industry(p.industry)||'—')} · ${esc(p.type||'—')}</dd>
+        <dt>Location</dt><dd>${esc([p.city,p.region,p.country].filter(Boolean).join(', ')||'—')} <span class="muted">${esc(p.market||'')}</span></dd>
+        <dt>Company size</dt><dd>${esc(L.size(p.size))}${p.employees?` <span class="muted">(${p.employees} employees)</span>`:''}</dd>
+        <dt>Opportunity</dt><dd class="chips">${p.opportunities.length?p.opportunities.map(o=>`<span class="pill amber">${esc(L.opp(o))}</span>`).join(''):'<span class="muted">None yet</span>'}</dd>
+        <dt>Potential service</dt><dd class="chips">${p.services.length?p.services.map(s=>`<span class="pill violet">${esc(L.svc(s))}</span>`).join(''):'<span class="muted">None yet</span>'}</dd>
+        <dt>Contact</dt><dd>${esc(p.contactName||'—')} <span class="muted">${esc(L.role(p.role)||'')}</span></dd>
+        <dt>Email</dt><dd>${esc(p.email||'—')} ${p.contactQuality!=='UNKNOWN'?`<span class="pill grey">${esc(L.quality(p.contactQuality))}</span>`:''}</dd>
+        <dt>Tags</dt><dd class="chips">${p.tags.length?p.tags.map(t=>`<span class="pill grey">${esc(t)}</span>`).join(''):'<span class="muted">None</span>'}</dd>
+      </dl>
+    </section>
+
+    <section class="sec">
+      <h3>Edit</h3>
+      <div class="grid3">
+        <div><label class="lbl" for="eFit">Fit</label>
+          <select id="eFit">${FITS.map(([s,l])=>`<option value="${s}" ${p.fit===s?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+        <div><label class="lbl" for="ePri">Priority</label>
+          <select id="ePri">${PRIORITIES.map(([s,l])=>`<option value="${s}" ${p.priority===s?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+        <div><label class="lbl" for="eCon">Contactability</label>
+          <select id="eCon">${CONTACTABILITY.map(([s,l])=>`<option value="${s}" ${p.contactability===s?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+      </div>
+      <div class="grid2" style="margin-top:10px">
+        <div><label class="lbl" for="eAct">Next action</label>
+          <input id="eAct" value="${esc(p.nextAction||'')}" placeholder="e.g. Follow-up 2 — case study" /></div>
+        <div><label class="lbl" for="eDate">Follow-up date</label>
+          <input id="eDate" type="date" value="${esc(p.followUpDate||'')}" /></div>
+      </div>
+      <div style="margin-top:10px">
+        <button class="btn sm" id="suggestBtn">Suggest services from opportunities</button>
+        <button class="btn sm" id="saveEdit">Save changes</button>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h3>Gate — ${p.stage==='NEW'?'research':p.stage==='RESEARCHED'?'qualification':'post-qualification'}</h3>
+      ${p.stage==='NEW'?checklist(p,'research'):p.stage==='RESEARCHED'?checklist(p,'qualification'):checklist(p,'enrollment')}
+      ${p.stage==='NEW'?`<div class="hint">${canResearch?'Research gate passes — you can move to Researched.':`${research.length} requirement(s) missing.`}</div>`:''}
+      ${p.stage==='RESEARCHED'?`<div class="hint">${canQualify?'Qualification gate passes.':`${qual.length} requirement(s) missing.`}</div>`:''}
+    </section>
+
+    <section class="sec">
+      <h3>Move stage</h3>
+      <div class="trans">
+        ${next.length?next.map(s=>{
+          const needsGate = s==='RESEARCHED' && !canResearch || s==='QUALIFIED' && !canQualify;
+          return `<button class="btn sm" data-move="${s}" ${needsGate?'aria-disabled="true" data-blocked="1"':''}>→ ${esc(L.stage(s))}</button>`;
+        }).join(''):'<span class="muted">Terminal stage. Reopen from the reopen button below.</span>'}
+      </div>
+      ${ui.pendingClose?`
+        <div style="margin-top:10px">
+          <label class="lbl" for="closeReason">Reason for ${esc(L.stage(ui.pendingClose))} (required)</label>
+          <input id="closeReason" placeholder="At least 3 characters" />
+          <div style="margin-top:8px"><button class="btn sm primary" id="confirmClose">Confirm ${esc(L.stage(ui.pendingClose))}</button>
+          <button class="btn sm" id="cancelClose">Cancel</button></div>
+        </div>`:''}
+      ${['WON','LOST','DISQUALIFIED'].includes(p.stage)?`<div style="margin-top:10px"><button class="btn sm" id="reopen">Reopen</button></div>`:''}
+      ${p.closedReason?`<div class="hint">Closed reason: ${esc(p.closedReason)}</div>`:''}
+    </section>
+
+    <section class="sec">
+      <h3>Notes</h3>
+      <div style="display:flex;gap:8px">
+        <input id="noteInput" placeholder="Add a note…" />
+        <button class="btn sm" id="addNote">Add</button>
+      </div>
+      ${p.notes.length?`<ul class="tl" style="margin-top:12px">${p.notes.slice().reverse().map(n=>`<li>${esc(n.text)}<time>${new Date(n.at).toLocaleString()}</time></li>`).join('')}</ul>`:'<div class="hint">No notes yet.</div>'}
+    </section>
+
+    <section class="sec">
+      <h3>Timeline</h3>
+      <ul class="tl">${p.events.slice().reverse().map(e=>`<li>${esc(e.text)}<time>${new Date(e.at).toLocaleString()}</time></li>`).join('')}</ul>
+    </section>
+  </div>
+
+  <div class="dfoot">
+    <button class="btn" id="enrollBtn" ${enrollmentMissing(p).length?'disabled':''}>Check enrollment gate</button>
+    <button class="btn" id="dupBtn">Merge duplicate…</button>
+    <span class="spacer"></span>
+    <button class="btn sm ghost" id="deleteBtn" style="color:var(--bad)">Delete</button>
+  </div>`;
+
+  // wiring
+  $('#closeD').onclick = closeDrawer;
+  $('#saveEdit').onclick = ()=>{
+    p.fit = $('#eFit').value; p.priority = $('#ePri').value;
+    p.contactability = $('#eCon').value;
+    p.nextAction = $('#eAct').value.trim(); p.followUpDate = $('#eDate').value;
+    if(p.priority==='DISQUALIFIED' && p.stage!=='DISQUALIFIED'){
+      p.stage='DISQUALIFIED'; p.closedReason='Priority set to Disqualified';
+      p.events.push({at:new Date().toISOString(),text:'Priority → Disqualified, stage forced to Disqualified, queued sends cancelled'});
+    }
+    p.events.push({at:new Date().toISOString(),text:'Record updated'});
+    commit('Saved');
+  };
+  $('#suggestBtn').onclick = ()=>{
+    const s = new Set(p.services);
+    p.opportunities.forEach(o=>(SUGGEST[o]||[]).forEach(x=>s.add(x)));
+    if(!s.size){ toast('No suggestion mapping for these opportunities','bad'); return; }
+    p.services=[...s];
+    p.events.push({at:new Date().toISOString(),text:`Services suggested from ${p.opportunities.length} opportunities`});
+    commit('Services suggested');
+  };
+  $('#addNote').onclick = ()=>{
+    const v = $('#noteInput').value.trim(); if(!v) return;
+    p.notes.push({at:new Date().toISOString(),text:v});
+    p.events.push({at:new Date().toISOString(),text:'Note added'});
+    commit('Note added');
+  };
+  $('#noteInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#addNote').click(); });
+  $('#enrollBtn').onclick = ()=>{
+    const m = enrollmentMissing(p);
+    toast(m.length?`Blocked: ${m.join(' · ')}`:'Enrollment gate passes — this prospect is eligible.','bad', m.length?6000:3000);
+  };
+  $('#dupBtn').onclick = ()=>{
+    const cand = db.find(x=>x.id!==p.id && (x.business.toLowerCase()===p.business.toLowerCase() || (x.domain && x.domain===p.domain)));
+    toast(cand?`Merge candidate: ${cand.business} (same ${cand.domain?'domain':'name'})`:'No duplicate candidate found.');
+  };
+  $('#deleteBtn').onclick = ()=>{
+    if(!confirm(`Delete ${p.business}?`)) return;
+    db = db.filter(x=>x.id!==p.id); save(); closeDrawer(); render(); toast('Prospect deleted');
+  };
+  if($('#reopen')) $('#reopen').onclick = ()=>{
+    const to = p.stage==='LOST' ? 'RESEARCHED' : 'NEW';
+    p.stage=to; p.closedReason=''; p.events.push({at:new Date().toISOString(),text:`Reopened to ${L.stage(to)}`});
+    commit(`Reopened to ${L.stage(to)}`);
+  };
+
+  $('#drawer').querySelectorAll('[data-move]').forEach(b=>{
+    b.onclick = ()=>{
+      const to = b.dataset.move;
+      if(b.dataset.blocked){
+        const miss = to==='RESEARCHED'?researchMissing(p):qualificationMissing(p);
+        toast(`Blocked by the ${to==='RESEARCHED'?'research':'qualification'} gate: ${miss.join(' · ')}`,'bad',6000);
+        return;
+      }
+      if(['LOST','DISQUALIFIED'].includes(to)){ ui.pendingClose=to; renderDrawer(); return; }
+      moveTo(p,to);
+    };
+  });
+  if($('#confirmClose')) $('#confirmClose').onclick = ()=>{
+    const r = $('#closeReason').value.trim();
+    if(r.length<3){ toast('A reason of at least 3 characters is required','bad'); return; }
+    moveTo(p, ui.pendingClose, r);
+  };
+  if($('#cancelClose')) $('#cancelClose').onclick = ()=>{ ui.pendingClose=null; renderDrawer(); };
+}
+
+function moveTo(p, to, reason){
+  const from = p.stage;
+  if(!(MATRIX[from]||[]).includes(to)){ toast(`Illegal transition ${L.stage(from)} → ${L.stage(to)}`,'bad'); return; }
+  if(to==='RESEARCHED' && researchMissing(p).length){ toast('Research gate not met','bad'); return; }
+  if(to==='QUALIFIED' && qualificationMissing(p).length){ toast('Qualification gate not met','bad'); return; }
+  p.stage = to;
+  if(['LOST','DISQUALIFIED'].includes(to)) p.closedReason = reason||'';
+  p.events.push({at:new Date().toISOString(),text:`Stage ${L.stage(from)} → ${L.stage(to)}${reason?` · ${reason}`:''}`});
+  ui.pendingClose=null;
+  commit(`Moved to ${L.stage(to)}`);
+}
+
+function commit(msg){
+  save(); render(); renderDrawer(); if(msg) toast(msg);
+}
+
+/* ============================================================
+   Add prospect modal
+   ============================================================ */
+function openAdd(){
+  ui.draft = { industry:'', type:'', opportunities:[], services:[] };
+  const m = $('#modal');
+  m.classList.add('on');
+  m.innerHTML = `
+  <div class="sheet">
+    <header>
+      <strong style="font-size:15px">New prospect</strong>
+      <span class="spacer" style="flex:1"></span>
+      <button class="icon-btn" id="closeM" aria-label="Close">✕</button>
+    </header>
+    <div class="body">
+      <div class="grid2">
+        <div><label class="lbl" for="nBiz">Business name *</label><input id="nBiz" placeholder="Harper & Vale Dental" /></div>
+        <div><label class="lbl" for="nDom">Domain</label><input id="nDom" placeholder="harpervale.co.uk" /></div>
+        <div><label class="lbl" for="nInd">Industry *</label>
+          <select id="nInd"><option value="">Select industry…</option>${INDUSTRIES.map(i=>`<option value="${i.slug}">${esc(i.label)}</option>`).join('')}</select></div>
+        <div><label class="lbl" for="nType">Business type</label>
+          <select id="nType" disabled><option value="">Select industry first</option></select></div>
+        <div><label class="lbl" for="nCity">City</label><input id="nCity" /></div>
+        <div><label class="lbl" for="nCountry">Country (ISO-2)</label><input id="nCountry" maxlength="2" placeholder="GB" /></div>
+        <div><label class="lbl" for="nMarket">Market</label><input id="nMarket" placeholder="UK" /></div>
+        <div><label class="lbl" for="nEmp">Employees</label><input id="nEmp" type="number" min="1" placeholder="14" /></div>
+      </div>
+
+      <div style="margin-top:14px">
+        <label class="lbl">Opportunity</label>
+        <div class="toggle" id="nOpp">${OPPORTUNITIES.map(([s,l])=>`<button type="button" data-opp="${s}" aria-pressed="false">${esc(l)}</button>`).join('')}</div>
+        <div class="hint">Unknown is exclusive and only allowed while the stage is New.</div>
+      </div>
+
+      <div style="margin-top:14px">
+        <label class="lbl">Potential service</label>
+        <div class="toggle" id="nSvc">${SERVICES.map(([s,l])=>`<button type="button" data-svc="${s}" aria-pressed="false">${esc(l)}</button>`).join('')}</div>
+      </div>
+
+      <div class="grid2" style="margin-top:14px">
+        <div><label class="lbl" for="nFit">Fit</label>
+          <select id="nFit">${FITS.map(([s,l])=>`<option value="${s}" ${s==='UNKNOWN'?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+        <div><label class="lbl" for="nPri">Priority</label>
+          <select id="nPri">${PRIORITIES.map(([s,l])=>`<option value="${s}" ${s==='MEDIUM'?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+        <div><label class="lbl" for="nContact">Contact name</label><input id="nContact" /></div>
+        <div><label class="lbl" for="nRole">Role</label>
+          <select id="nRole"><option value="">Select role…</option>${ROLES.map(([s,l])=>`<option value="${s}">${esc(l)}</option>`).join('')}</select></div>
+        <div><label class="lbl" for="nEmail">Email</label><input id="nEmail" type="email" /></div>
+        <div><label class="lbl" for="nTags">Tags (comma separated)</label><input id="nTags" placeholder="warm, Q4" /></div>
+      </div>
+
+      <div class="grid2" style="margin-top:14px">
+        <div><label class="lbl" for="nAct">Next action</label><input id="nAct" /></div>
+        <div><label class="lbl" for="nDate">Follow-up date</label><input id="nDate" type="date" /></div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+        <button class="btn" id="cancelAdd">Cancel</button>
+        <button class="btn primary" id="saveAdd">Create prospect</button>
+      </div>
+    </div>
+  </div>`;
+
+  const m2 = $('#modal');
+  const close = ()=>{ m2.classList.remove('on'); m2.innerHTML=''; };
+  $('#closeM').onclick = close; $('#cancelAdd').onclick = close;
+  m2.onclick = e=>{ if(e.target===m2) close(); };
+
+  $('#nInd').onchange = e=>{
+    const ind = e.target.value; ui.draft.industry = ind;
+    const sel = $('#nType');
+    if(!ind){ sel.innerHTML='<option value="">Select industry first</option>'; sel.disabled=true; return; }
+    sel.disabled = false;
+    sel.innerHTML = '<option value="">Select type…</option>' + TYPES[ind].map(t=>`<option>${esc(t)}</option>`).join('');
+  };
+  $('#nOpp').onclick = e=>{
+    const b = e.target.closest('[data-opp]'); if(!b) return;
+    const s = b.dataset.opp;
+    if(s==='UNKNOWN'){ ui.draft.opportunities = ui.draft.opportunities.includes('UNKNOWN')?[]:['UNKNOWN']; }
+    else{
+      ui.draft.opportunities = ui.draft.opportunities.filter(x=>x!=='UNKNOWN');
+      ui.draft.opportunities = ui.draft.opportunities.includes(s)
+        ? ui.draft.opportunities.filter(x=>x!==s) : [...ui.draft.opportunities, s];
+    }
+    syncToggles();
+  };
+  $('#nSvc').onclick = e=>{
+    const b = e.target.closest('[data-svc]'); if(!b) return;
+    const s = b.dataset.svc;
+    ui.draft.services = ui.draft.services.includes(s)
+      ? ui.draft.services.filter(x=>x!==s) : [...ui.draft.services, s];
+    syncToggles();
+  };
+  function syncToggles(){
+    $('#nOpp').querySelectorAll('[data-opp]').forEach(b=>b.setAttribute('aria-pressed', ui.draft.opportunities.includes(b.dataset.opp)));
+    $('#nSvc').querySelectorAll('[data-svc]').forEach(b=>b.setAttribute('aria-pressed', ui.draft.services.includes(b.dataset.svc)));
+  }
+
+  $('#saveAdd').onclick = ()=>{
+    const biz = $('#nBiz').value.trim();
+    const ind = $('#nInd').value;
+    if(!biz || !ind){ toast('Business name and industry are required','bad'); return; }
+    const emp = Number($('#nEmp').value) || null;
+    const size = deriveSize(emp);
+    const pri = $('#nPri').value;
+    const p = {
+      id: crypto.randomUUID(), business:biz, domain:$('#nDom').value.trim(),
+      industry:ind, type:$('#nType').value, city:$('#nCity').value.trim(), region:'',
+      country:$('#nCountry').value.trim().toUpperCase(), market:$('#nMarket').value.trim(),
+      employees:emp, size,
+      stage: pri==='DISQUALIFIED' ? 'DISQUALIFIED' : 'NEW',
+      fit:$('#nFit').value, priority:pri,
+      opportunities: ui.draft.opportunities.slice(), services: ui.draft.services.slice(),
+      contactName:$('#nContact').value.trim(), role:$('#nRole').value,
+      email:$('#nEmail').value.trim().toLowerCase(), phone:'', contactQuality:$('#nEmail').value?'UNVERIFIED':'UNKNOWN',
+      contactability:'OK', nextAction:$('#nAct').value.trim(), followUpDate:$('#nDate').value,
+      tags:$('#nTags').value.split(',').map(t=>t.trim()).filter(Boolean),
+      notes:[], source:'manual', closedReason: pri==='DISQUALIFIED'?'Disqualified at creation':'',
+      createdAt:new Date().toISOString(),
+      events:[{at:new Date().toISOString(),text:'Prospect created manually'}]
+    };
+    db.unshift(p); save(); close(); ui.stage=''; render(); toast('Prospect created');
+    setTimeout(()=>openDrawer(p.id), 120);
+  };
+}
+
+function deriveSize(n){
+  if(!n) return 'UNKNOWN';
+  if(n===1) return 'SOLO';
+  if(n<=5) return 'MICRO';
+  if(n<=20) return 'SMALL';
+  if(n<=50) return 'SMALL_MEDIUM';
+  if(n<=200) return 'MEDIUM';
+  return 'LARGE';
+}
+
+/* ============================================================
+   Misc UI
+   ============================================================ */
+function toast(msg, tone='', ms=3200){
+  const t = document.createElement('div');
+  t.className = 'toast'+(tone?' '+tone:'');
+  t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>t.remove(), ms);
+}
+
+function exportCsv(){
+  const rows = filtered();
+  const head = ['business','domain','industry','business_type','city','country','market','employees','company_size',
+    'stage','fit','priority','opportunities','services','contact_name','role','email','contact_quality','contactability',
+    'next_action','follow_up_date','tags','source'];
+  const csv = [head.join(',')].concat(rows.map(p=>[
+    p.business,p.domain,L.industry(p.industry),p.type,p.city,p.country,p.market,p.employees||'',L.size(p.size),
+    L.stage(p.stage),L.fit(p.fit),L.priority(p.priority),p.opportunities.join('|'),p.services.join('|'),
+    p.contactName,L.role(p.role)||'',p.email,L.quality(p.contactQuality),L.contactability(p.contactability),
+    p.nextAction,p.followUpDate,p.tags.join('|'),p.source
+  ].map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','))).join('\n');
+  const url = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  const a = document.createElement('a'); a.href=url; a.download=`prospects-${iso(today)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast(`Exported ${rows.length} rows`);
+}
+
+$('#q').addEventListener('input', e=>{ ui.q = e.target.value; renderRows(); });
+$('#fIndustry').addEventListener('change', e=>{ ui.industry=e.target.value; renderRows(); });
+$('#fFit').addEventListener('change', e=>{ ui.fit=e.target.value; renderRows(); });
+$('#fPriority').addEventListener('change', e=>{ ui.priority=e.target.value; renderRows(); });
+$('#fGate').addEventListener('change', e=>{ ui.gate=e.target.value; renderRows(); });
+$('#clearBtn').onclick = ()=>{
+  ui.q=''; ui.industry=''; ui.stage=''; ui.fit=''; ui.priority=''; ui.gate='';
+  $('#q').value=''; render();
+};
+$('#addBtn').onclick = openAdd;
+$('#exportBtn').onclick = exportCsv;
+$('#scrim').onclick = closeDrawer;
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    if($('#modal').classList.contains('on')){ $('#modal').classList.remove('on'); $('#modal').innerHTML=''; }
+    else closeDrawer();
+  }
+});
+$('#themeBtn').onclick = ()=>{
+  const cur = document.documentElement.dataset.theme === 'dark' ? 'light':'dark';
+  document.documentElement.dataset.theme = cur;
+  try{ localStorage.setItem(KEY+'.theme', cur); }catch(e){}
+};
+try{ const t = localStorage.getItem(KEY+'.theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+$('#resetBtn').onclick = ()=>{
+  if(!confirm('Reset to demo data? Your changes will be lost.')) return;
+  db = seed(); save(); closeDrawer(); render(); toast('Demo data restored');
+};
+
+render();
+</script>
+</body>
+</html>
