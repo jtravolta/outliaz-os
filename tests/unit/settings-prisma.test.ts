@@ -8,19 +8,10 @@ import { createPrismaClient } from "../../lib/db/prisma";
 import { getWorkspace, listIntegrations } from "../../lib/services/settings";
 
 test("getWorkspace uses its Prisma client and keeps workspace scope", async () => {
-  const sourceUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-  assert.ok(sourceUrl, "DIRECT_URL or DATABASE_URL must be configured");
-
-  const source = postgres(sourceUrl, { max: 1, prepare: false });
-  const [workspace] = await source<{ id: string }[]>`
-    select id from workspaces order by created_at limit 1
-  `;
-  await source.end();
-  assert.ok(workspace, "source database must contain a workspace");
-
-  const testUrl = new URL(sourceUrl);
-  testUrl.pathname = "/outbound_os_prisma_test";
-  const prisma = createPrismaClient(testUrl.toString());
+  const testUrl =
+    process.env.TEST_DATABASE_URL ??
+    "postgresql://postgres:postgres@127.0.0.1:5432/outbound_os_supabase_test";
+  const prisma = createPrismaClient(testUrl);
 
   try {
     await assert.rejects(
@@ -28,7 +19,7 @@ test("getWorkspace uses its Prisma client and keeps workspace scope", async () =
         {
           user: {
             userId: "00000000-0000-0000-0000-000000000000",
-            workspaceId: workspace.id,
+            workspaceId: randomUUID(),
             email: "test@example.com",
             name: "Test",
             role: "OWNER",
@@ -46,25 +37,38 @@ test("getWorkspace uses its Prisma client and keeps workspace scope", async () =
 });
 
 test("listIntegrations reads credentials only from the scoped Prisma workspace", async () => {
-  const sourceUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-  assert.ok(sourceUrl, "DIRECT_URL or DATABASE_URL must be configured");
-
-  const testUrl = new URL(sourceUrl);
-  testUrl.pathname = "/outbound_os_prisma_test";
-  const prisma = createPrismaClient(testUrl.toString());
+  const testUrl =
+    process.env.TEST_DATABASE_URL ??
+    "postgresql://postgres:postgres@127.0.0.1:5432/outbound_os_supabase_test";
+  const prisma = createPrismaClient(testUrl);
   const workspaceId = randomUUID();
+  const ownerId = randomUUID();
 
-  await prisma.workspaces.create({
-    data: { id: workspaceId, name: "Prisma integration test" },
-  });
-  await prisma.integration_credentials.create({
-    data: {
-      workspace_id: workspaceId,
-      kind: "APIFY",
-      label: "isolated-prisma-credential",
-      config: { actor: "test" },
-      secret_ciphertext: "encrypted-test-value",
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.workspaces.create({
+      data: { id: workspaceId, name: "Prisma integration test" },
+    });
+    await tx.users.create({
+      data: {
+        id: ownerId,
+        workspace_id: workspaceId,
+        email: `${ownerId}@example.test`,
+        name: "Test owner",
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    });
+    await tx.integration_credentials.create({
+      data: {
+        workspace_id: workspaceId,
+        kind: "APIFY",
+        label: "isolated-prisma-credential",
+        config: { actor: "test" },
+        secret_ciphertext: Buffer.from("encrypted-test-value"),
+        secret_iv: Buffer.alloc(12),
+        secret_tag: Buffer.alloc(16),
+      },
+    });
   });
 
   try {
@@ -86,7 +90,16 @@ test("listIntegrations reads credentials only from the scoped Prisma workspace",
     assert.equal(apify?.configured, true);
     assert.equal(apify?.label, "isolated-prisma-credential");
   } finally {
-    await prisma.workspaces.delete({ where: { id: workspaceId } });
     await prisma.$disconnect();
+    const cleanup = postgres(testUrl, {
+      max: 1,
+      prepare: false,
+      onnotice: () => {},
+    });
+    try {
+      await cleanup`truncate table workspaces cascade`;
+    } finally {
+      await cleanup.end();
+    }
   }
 });

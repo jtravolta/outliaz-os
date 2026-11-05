@@ -44,11 +44,28 @@ async function snapshot(connectionString: string): Promise<SchemaSnapshot> {
       where schemaname = 'public' and tablename <> '_prisma_migrations'
       order by tablename, indexname
     `;
+    const stableConstraints = constraints.filter(
+      ({ name }) => !name.endsWith("_not_null"),
+    );
+    const stableIndexes = indexes
+      .map(({ table, definition }) => ({
+        table,
+        name: "",
+        definition: definition.replace(
+          /^CREATE (UNIQUE )?INDEX \S+ ON /,
+          "CREATE $1INDEX ON ",
+        ),
+      }))
+      .sort((a, b) =>
+        `${a.table}:${a.definition}`.localeCompare(
+          `${b.table}:${b.definition}`,
+        ),
+      );
     return {
       tables: tables.map(({ name }) => name),
       enums,
-      constraints,
-      indexes,
+      constraints: stableConstraints,
+      indexes: stableIndexes,
     };
   } finally {
     await sql.end();
@@ -59,12 +76,13 @@ test("Prisma baseline recreates the existing PostgreSQL schema", async () => {
   const sourceUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   assert.ok(sourceUrl, "DIRECT_URL or DATABASE_URL must be configured");
 
-  const testUrl = new URL(sourceUrl);
-  testUrl.pathname = "/outbound_os_prisma_test";
+  const testUrl =
+    process.env.TEST_DATABASE_URL ??
+    "postgresql://postgres:postgres@127.0.0.1:5432/outbound_os_supabase_test";
 
   const [source, target] = await Promise.all([
     snapshot(sourceUrl),
-    snapshot(testUrl.toString()),
+    snapshot(testUrl),
   ]);
 
   assert.deepEqual(target, source);

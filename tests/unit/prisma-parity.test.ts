@@ -6,8 +6,9 @@ import postgres from "postgres";
 import { createPrismaClient } from "../../lib/db/prisma";
 
 test("Prisma reads the same core row counts as PostgreSQL", async () => {
-  const connectionString = process.env.DATABASE_URL;
-  assert.ok(connectionString, "DATABASE_URL must be configured");
+  const connectionString =
+    process.env.TEST_DATABASE_URL ??
+    "postgresql://postgres:postgres@127.0.0.1:5432/outbound_os_supabase_test";
 
   const sql = postgres(connectionString, { max: 1, prepare: false });
   const prisma = createPrismaClient(connectionString);

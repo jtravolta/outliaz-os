@@ -10,11 +10,13 @@
 - Repaired all eight UX audit findings: semantic reply detail routes and mobile inbox cards, prospect drawer links, draft-only Outreach persistence, accessible Settings labels, consistent Offers/page headings, friendly formatting, and mobile Dashboard overflow.
 - Outreach drafts are stored under workspace-scoped `prospects.custom_fields.outreachDraft`; saving creates no message, enrollment, queue item, provider call, or send. Drafting works at NEW and without an email.
 - Added six focused UX regression tests, including an intercepted draft save that proves the UI uses only the draft endpoint.
-- Started the approved preservation-first Drizzle-to-Prisma migration. Prisma 7.10.1 is pinned, the existing 31-table PostgreSQL schema was introspected read-only, and a parity test confirms Prisma sees the same workspace/user/prospect row counts as PostgreSQL.
-- Created an empty isolated local `outbound_os_prisma_test` database for future migration verification. The current `outbound_os` database was not migrated, reset, seeded, or modified.
-- Generated a Prisma baseline migration and applied it only to `outbound_os_prisma_test`. A catalog-level parity test verifies all 31 application tables, enums, constraints (including normalized-email checks), and indexes match the existing database; Prisma's own migration-history table is intentionally excluded.
+- Started the approved preservation-first Drizzle-to-Prisma migration. Prisma 7.10.1 is pinned; the initial 31-table local baseline was superseded by the user-supplied authoritative Supabase schema below.
+- Preserved the original local `outbound_os` database unchanged and created isolated local test databases for migration verification.
 - Migrated the first live service read to Prisma: Settings workspace lookup now uses the pooled Prisma client, preserves the existing camelCase API response, and enforces lookup by the session workspace ID. A real-database injection test proves it does not fall back to Drizzle.
 - Migrated Settings integration-list reads to Prisma with explicit workspace scoping and preserved masked-secret response fields. Added the missing `npm run db` command for restarting the existing persistent embedded PostgreSQL server without resetting or seeding it.
+- Applied the user-supplied 37-table schema and foreign-key advisor indexes to the confirmed empty Supabase project `ubbqguhsamfclxxqootm`. Verification fixtures rolled back, leaving zero workspaces/users/prospects; all 37 tables have RLS and browser roles have zero table grants.
+- Re-introspected the authoritative Supabase schema into Prisma (37 models, 22 enums), replaced the obsolete 31-table baseline, verified zero schema drift, and marked `20261104190000_baseline` as applied without re-running it. Prisma reports the hosted schema is up to date.
+- Database tests now use only local `outbound_os_supabase_test`; they cannot derive a writable target from the hosted `DIRECT_URL`. Catalog parity normalizes PostgreSQL 17/18 NOT NULL representation and nondeterministic advisor index names while still comparing tables, enums, named constraints, and index definitions.
 
 - Compared the existing Next.js app with BUILD-PLAN.md and canonical TAXONOMY.md.
 - Approved the focused personal workflow design: file import -> offer -> saved prospect email draft, no sending.
@@ -25,8 +27,9 @@
 ## Next
 
 - Convert service modules from Drizzle to Prisma incrementally behind the existing service/API boundaries, starting with a read-only surface and preserving workspace scoping.
-- Convert read-only service functions first, then mutations, while running Drizzle and Prisma side-by-side. Do not mark the baseline as applied on the current database without a separate explicit checkpoint.
-- Connect a separate Supabase development project/branch later using a transaction-pooler runtime URL and session/direct migration URL; do not place credentials in Git or chat.
+- Convert read-only service functions first, then mutations, while running Drizzle and Prisma side-by-side.
+- Bootstrap the first hosted workspace/owner only after explicit user approval. Until then hosted sign-in and database-backed E2E flows intentionally have no user fixture.
+- Continue replacing old Drizzle service queries: the authoritative 37-table schema differs materially from `lib/db/schema.ts`, so untouched Drizzle-backed routes are not yet compatible with Supabase.
 
 ## Blocked / unverified
 
@@ -35,13 +38,14 @@
 - npm reports 8 dependency advisories (5 moderate, 3 high); separate remediation review needed, no forced upgrades applied.
 
 - Git author name/email missing: documentation commit failed; no identity invented or configured.
-- agent-browser CLI is not installed. Built-in browser inspection was used for the hosted reference; screenshot capture failed because its desktop tab was not visible.
-- No schema migration, personal-data import, external provider call, email send, scrape, or deployment was performed.
-- Supabase CLI/MCP and hosted development credentials are not configured. Hosted verification remains blocked until the user connects a separate development project/branch.
+- No personal-data import, external provider call, email send, scrape, or deployment was performed.
+- Supabase CLI/MCP is not configured; direct/session pooler URLs are configured locally and verified. Management API advisors still require CLI/MCP or dashboard access.
 - Shared UI slice is authorized; later functional slices still require their planned scope gates. No real database migration/import, external email, paid scraping or public deployment authorized by this UI request.
 
 ## Verification evidence
 
+- Supabase baseline verification on 2026-11-05: handoff `verify_schema.sql` passed and rolled back; 37/37 public application tables have RLS, browser roles have zero table grants, hosted workspace/user/prospect counts remain zero, `prisma migrate diff` reports no difference, and `prisma migrate status` reports up to date.
+- Authoritative-schema application verification: `npm run test:unit` (4/4 local-only database tests), `npm run typecheck`, `npm run ui:build`, and the synthetic shell Playwright suite (8/8) passed. The six authenticated workflow E2E tests are intentionally deferred until the first hosted owner is explicitly bootstrapped.
 - UX repair verification on 2026-11-04: `npm run typecheck`, `npm run fmt:check`, `npx playwright test --workers=1` (14/14 passed), and `NEXT_DIST_DIR=.next-ui-build npm run build` all passed.
 
 - Final production verification: UI_TEST_URL=http://127.0.0.1:3002 npm test -- --workers=1 -> 8 passed (16.2s), including zero axe violations in light and dark review screens.
