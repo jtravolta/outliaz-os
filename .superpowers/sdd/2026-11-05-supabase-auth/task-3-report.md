@@ -23,7 +23,7 @@ Complete.
 
 ## Commit
 
-`03301687cb9184610918c17411c5cb9f22ae53c1` — `feat: add Supabase magic-link authentication`
+`cf555fddd803068db9e7c91eecce3f12fd4d2973` — `feat: add Supabase magic-link authentication`
 
 ## Concerns
 
