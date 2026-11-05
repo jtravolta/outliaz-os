@@ -116,3 +116,20 @@ test("callback preserves the denial redirect when session cleanup throws", async
 
   assert.equal(response.headers.get("location"), "https://app.example.test/login?error=access_denied");
 });
+
+test("callback preserves the denial redirect when SSR client construction throws", async () => {
+  const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const previousKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  try {
+    const response = await handleCallback(request("https://app.example.test/auth/callback"));
+    assert.equal(response.headers.get("location"), "https://app.example.test/login?error=access_denied");
+  } finally {
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = previousKey;
+  }
+});

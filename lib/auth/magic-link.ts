@@ -44,16 +44,26 @@ function denied(request: Request) {
 
 export async function handleCallback(request: Request, dependencies?: CallbackDependencies) {
   const code = new URL(request.url).searchParams.get("code");
+
+  if (!code) {
+    if (dependencies) {
+      await safelySignOut(dependencies.signOut);
+    } else {
+      try {
+        const supabase = await createServerSupabaseClient();
+        await safelySignOut(() => supabase.auth.signOut());
+      } catch {
+        // Client construction and cleanup are best-effort for denial paths.
+      }
+    }
+    return denied(request);
+  }
+
   const supabase = dependencies ? undefined : await createServerSupabaseClient();
   const exchangeCodeForSession = dependencies?.exchangeCodeForSession ??
     ((value: string) => supabase!.auth.exchangeCodeForSession(value));
   const resolveUser = dependencies?.resolveUser ?? (() => getSupabaseSessionUser(supabase));
   const signOut = dependencies?.signOut ?? (() => supabase!.auth.signOut());
-
-  if (!code) {
-    await safelySignOut(signOut);
-    return denied(request);
-  }
 
   try {
     const { error } = await exchangeCodeForSession(code);
