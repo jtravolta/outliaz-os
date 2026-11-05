@@ -17,6 +17,7 @@
     "test": "playwright test",
     "test:e2e": "playwright test",
     "fmt:check": "prettier --check components/app-shell.tsx components/nav-meta.tsx components/shell-preferences.tsx components/ui/button.tsx components/ui/sheet.tsx components/ui/tooltip.tsx app/layout.tsx app/ui-review/page.tsx app/globals.css tests/e2e/shell.spec.ts playwright.config.ts",
+    "db": "tsx scripts/db.ts",
     "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:reset": "tsx --env-file=.env scripts/reset.ts",

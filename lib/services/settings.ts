@@ -111,11 +111,13 @@ const mask = (row: { secretCiphertext: string | null }) =>
 
 /* ── integrations ───────────────────────────────────────────────────────── */
 
-export async function listIntegrations(ctx: Ctx) {
-  const rows = await db
-    .select()
-    .from(integrationCredentials)
-    .where(eq(integrationCredentials.workspaceId, ctx.user.workspaceId));
+export async function listIntegrations(
+  ctx: Ctx,
+  prisma: ReturnType<typeof createPrismaClient> = getPrismaClient(),
+) {
+  const rows = await prisma.integration_credentials.findMany({
+    where: { workspace_id: ctx.user.workspaceId },
+  });
 
   const kinds: ("APIFY" | "RESEND" | "IMAP")[] = ["APIFY", "RESEND", "IMAP"];
   return kinds.map((kind) => {
@@ -125,9 +127,11 @@ export async function listIntegrations(ctx: Ctx) {
       kind,
       label: row?.label ?? null,
       config: row?.config ?? {},
-      secretMasked: row ? mask(row) : "",
-      verifiedAt: row?.verifiedAt ?? null,
-      lastError: row?.lastError ?? null,
+      secretMasked: row
+        ? mask({ secretCiphertext: row.secret_ciphertext })
+        : "",
+      verifiedAt: row?.verified_at ?? null,
+      lastError: row?.last_error ?? null,
       mode: active.mode,
       configured: !!row,
     };

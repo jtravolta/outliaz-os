@@ -14,6 +14,7 @@
 - Created an empty isolated local `outbound_os_prisma_test` database for future migration verification. The current `outbound_os` database was not migrated, reset, seeded, or modified.
 - Generated a Prisma baseline migration and applied it only to `outbound_os_prisma_test`. A catalog-level parity test verifies all 31 application tables, enums, constraints (including normalized-email checks), and indexes match the existing database; Prisma's own migration-history table is intentionally excluded.
 - Migrated the first live service read to Prisma: Settings workspace lookup now uses the pooled Prisma client, preserves the existing camelCase API response, and enforces lookup by the session workspace ID. A real-database injection test proves it does not fall back to Drizzle.
+- Migrated Settings integration-list reads to Prisma with explicit workspace scoping and preserved masked-secret response fields. Added the missing `npm run db` command for restarting the existing persistent embedded PostgreSQL server without resetting or seeding it.
 
 - Compared the existing Next.js app with BUILD-PLAN.md and canonical TAXONOMY.md.
 - Approved the focused personal workflow design: file import -> offer -> saved prospect email draft, no sending.
