@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createBrowserSupabaseClient } from "../../lib/supabase/browser";
 import { createServerSupabaseClient } from "../../lib/supabase/server";
+import { validateSupabaseAuthConfig } from "../../lib/auth/session";
 
 const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const originalKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -27,6 +28,22 @@ test("browser client requires the public Supabase URL and publishable key", () =
     );
   } finally {
     restoreEnvironment();
+  }
+});
+
+test("production auth configuration fails closed when a public Supabase variable is missing", () => {
+  const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const previousKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  try {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    assert.throws(validateSupabaseAuthConfig, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  } finally {
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = previousKey;
   }
 });
 

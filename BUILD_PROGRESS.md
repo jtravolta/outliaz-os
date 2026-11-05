@@ -65,6 +65,18 @@
 - Initial Playwright run failed all six intended missing-shell checks; implementation then passed six, expanded to eight after independent review. Final development suite: npm test -- --workers=1 -> 8 passed.
 - Production build with NEXT_DIST_DIR=.next-ui-build completed successfully twice, including final reviewed fixes; isolated output prevents interfering with the old production instance on port 3000.
 - Typecheck passed. Taste lint on shell/review/CSS: 0 FAIL, 2 WARN (legacy monospace token and input focus ring, not decorative shell treatments).
+
+## Supabase Auth cutover (2026-11-05)
+
+- Completed the local Auth cutover boundary: production Auth configuration
+  fails closed when either public Supabase variable is absent, the custom HMAC
+  `oos_session` implementation is removed, and the legacy database email helper
+  is unavailable when `SUPABASE_AUTH_CUTOVER=true`.
+- Preserved application role/workspace resolution from the active mapped
+  `public.users` row. Hosted dashboard settings and owner UUID linking are
+  documented in `docs/supabase-auth-migration.md` and were not executed.
+- Verification evidence is recorded in
+  `.superpowers/sdd/2026-11-05-supabase-auth/task-5-report.md`.
 - Initial production taste inspection: 0 FAIL, 2 WARN (explicit user brand palette retained; unequal context/main panel heights intentionally follow reference rather than stretching a short context panel into empty space).
 - Six screenshots (1440/768/390, both themes) captured and opened. No horizontal overflow. Final production screenshots/checks follow final build; first images are not claimed as post-final-change evidence.
 - Independent read-only review found short-sidebar clipping and mobile launcher overlap. Both reproduced as red browser tests and fixed; regression suite green. Minor findings deferred: /settings breadcrumb fallback, More current-destination indication, mutation guard breadth and sheet overscroll containment.

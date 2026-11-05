@@ -1,11 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
-
 import { createPrismaClient, getPrismaClient } from "@/lib/db/prisma";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-
-export const SESSION_COOKIE = "oos_session";
-const MAX_AGE = 60 * 60 * 24 * 30;
 
 export type SessionUser = {
   userId: string;
@@ -77,45 +71,19 @@ function isApplicationUserRow(value: unknown): value is ApplicationUserRow {
     && isWorkspace;
 }
 
-const secret = () =>
-  process.env.APP_ENCRYPTION_KEY ?? "dev-only-insecure-key-please-change-me";
+const SUPABASE_AUTH_CUTOVER = "true";
 
-const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64url");
-const unb64 = (s: string) => Buffer.from(s, "base64url").toString("utf8");
-
-function sign(payload: string) {
-  return createHmac("sha256", secret()).update(payload).digest("base64url");
+export function isSupabaseAuthCutoverEnabled() {
+  return process.env.SUPABASE_AUTH_CUTOVER === SUPABASE_AUTH_CUTOVER;
 }
 
-export function encodeSession(
-  user: SessionUser,
-  exp = Date.now() + MAX_AGE * 1000,
-) {
-  const payload = b64(JSON.stringify({ ...user, exp }));
-  return `${payload}.${sign(payload)}`;
-}
-
-export function decodeSession(token?: string | null): SessionUser | null {
-  if (!token) return null;
-  const [payload, sig] = token.split(".");
-  if (!payload || !sig) return null;
-  const expected = sign(payload);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  try {
-    const data = JSON.parse(unb64(payload));
-    if (!data.exp || data.exp < Date.now()) return null;
-    return {
-      userId: data.userId,
-      workspaceId: data.workspaceId,
-      email: data.email,
-      name: data.name,
-      role: data.role,
-      workspaceName: data.workspaceName,
-    };
-  } catch {
-    return null;
+/** Validate the browser-safe Auth configuration before any Auth operation. */
+export function validateSupabaseAuthConfig() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is required");
+  }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required");
   }
 }
 
@@ -132,6 +100,7 @@ export async function getSupabaseSessionUser(
   prisma?: UserLookup,
 ): Promise<SessionUser | null> {
   try {
+    if (!supabase) validateSupabaseAuthConfig();
     const client = supabase ?? (await createServerSupabaseClient());
     const { data, error } = await client.auth.getClaims();
     const userId = data?.claims && isUuid(data.claims.sub)
@@ -189,14 +158,17 @@ export function can(
 }
 
 /**
- * Local-only sign-in: any address on ALLOWED_EMAILS (and present in users)
- * gets a session. In production this is where Auth.js magic-link / Google
- * would sit — the rest of the app only depends on SessionUser.
+ * Controlled pre-cutover migration helper. Supabase Auth is the only active
+ * production sign-in path; this function is retained only for local migration
+ * verification while SUPABASE_AUTH_CUTOVER is false.
  */
 export async function signInWithEmail(
   email: string,
-  prisma: ReturnType<typeof createPrismaClient> = getPrismaClient(),
+  prisma?: ReturnType<typeof createPrismaClient>,
 ): Promise<SessionUser | null> {
+  if (isSupabaseAuthCutoverEnabled()) return null;
+
+  const db = prisma ?? getPrismaClient();
   const normalized = email.trim().toLowerCase();
   const allowlist = (process.env.ALLOWED_EMAILS ?? "")
     .split(",")
@@ -211,7 +183,7 @@ export async function signInWithEmail(
     return null;
   }
 
-  const row = await prisma.users.findUnique({
+  const row = await db.users.findUnique({
     where: { email: normalized },
     select: {
       id: true,
@@ -234,20 +206,4 @@ export async function signInWithEmail(
     role: row.role as SessionUser["role"],
     workspaceName: row.workspaces.name,
   };
-}
-
-export async function setSessionCookie(session: SessionUser) {
-  const store = await cookies();
-  store.set(SESSION_COOKIE, encodeSession(session), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: MAX_AGE,
-  });
-}
-
-export async function clearSessionCookie() {
-  const store = await cookies();
-  store.delete(SESSION_COOKIE);
 }

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   getSupabaseSessionUser,
   requireSession,
+  signInWithEmail,
   type SessionUser,
 } from "../../lib/auth/session";
 
@@ -127,4 +128,27 @@ test("rejects disabled application users and uses database role/workspace values
   });
 
   assert.equal(await getSupabaseSessionUser(supabase, lookup), null);
+});
+
+test("legacy email sign-in is unavailable after the Supabase cutover", async () => {
+  const previousCutover = process.env.SUPABASE_AUTH_CUTOVER;
+  let lookupCount = 0;
+  process.env.SUPABASE_AUTH_CUTOVER = "true";
+
+  try {
+    const prisma = {
+      users: {
+        findUnique: async () => {
+          lookupCount += 1;
+          return null;
+        },
+      },
+    } as never;
+
+    assert.equal(await signInWithEmail("owner@example.test", prisma), null);
+    assert.equal(lookupCount, 0);
+  } finally {
+    if (previousCutover === undefined) delete process.env.SUPABASE_AUTH_CUTOVER;
+    else process.env.SUPABASE_AUTH_CUTOVER = previousCutover;
+  }
 });
