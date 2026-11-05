@@ -11,7 +11,7 @@ const connectionString =
 const globalForDb = globalThis as unknown as { __sql?: ReturnType<typeof postgres> };
 
 const sqlClient = globalForDb.__sql ?? postgres(connectionString, {
-  max: Number(process.env.DB_POOL_MAX ?? 5),
+  max: Number(process.env.DB_POOL_MAX ?? 10),
   idle_timeout: 20,
   prepare: false,
   onnotice: () => {},
