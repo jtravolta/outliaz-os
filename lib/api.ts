@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { getSession, type SessionUser } from "@/lib/auth/session";
+import { requireSession, type SessionUser } from "@/lib/auth/session";
 import { errorResponse, type Ctx } from "@/lib/services/common";
 
 export type RouteContext<P = Record<string, string>> = {
@@ -9,9 +9,7 @@ export type RouteContext<P = Record<string, string>> = {
 
 /** Session guard for route handlers. */
 export async function session(): Promise<SessionUser> {
-  const user = await getSession();
-  if (!user) throw new Error("UNAUTHORIZED");
-  return user;
+  return requireSession();
 }
 
 export async function ctx(): Promise<Ctx> {

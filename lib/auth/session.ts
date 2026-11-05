@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { createPrismaClient, getPrismaClient } from "@/lib/db/prisma";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const SESSION_COOKIE = "oos_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
@@ -13,6 +14,42 @@ export type SessionUser = {
   name: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
   workspaceName: string;
+};
+
+type ClaimsClient = {
+  auth: {
+    getClaims: () => Promise<{
+      data: { claims: Record<string, unknown> } | null;
+      error: unknown;
+    }>;
+  };
+};
+
+type UserLookup = {
+  users: {
+    findUnique: (args: {
+      where: { id: string };
+      select: {
+        id: true;
+        workspace_id: true;
+        email: true;
+        name: true;
+        role: true;
+        status: true;
+        workspaces: { select: { name: true } };
+      };
+    }) => Promise<unknown>;
+  };
+};
+
+type ApplicationUserRow = {
+  id: string;
+  workspace_id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  status: string;
+  workspaces: { name: string };
 };
 
 const secret = () =>
@@ -58,8 +95,46 @@ export function decodeSession(token?: string | null): SessionUser | null {
 }
 
 export async function getSession(): Promise<SessionUser | null> {
-  const store = await cookies();
-  return decodeSession(store.get(SESSION_COOKIE)?.value);
+  return getSupabaseSessionUser();
+}
+
+/** Resolve the verified Supabase identity to an active application user. */
+export async function getSupabaseSessionUser(
+  supabase?: ClaimsClient,
+  prisma?: UserLookup,
+): Promise<SessionUser | null> {
+  const client = supabase ?? (await createServerSupabaseClient());
+  const { data, error } = await client.auth.getClaims();
+  const userId = data?.claims && typeof data.claims.sub === "string"
+    ? data.claims.sub
+    : null;
+
+  if (error || !userId) return null;
+
+  const db = prisma ?? getPrismaClient();
+  const row = (await db.users.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      workspace_id: true,
+      email: true,
+      name: true,
+      role: true,
+      status: true,
+      workspaces: { select: { name: true } },
+    },
+  })) as ApplicationUserRow | null;
+
+  if (!row || row.status !== "ACTIVE") return null;
+
+  return {
+    userId: row.id,
+    workspaceId: row.workspace_id,
+    email: row.email,
+    name: row.name ?? row.email,
+    role: row.role as SessionUser["role"],
+    workspaceName: row.workspaces.name,
+  };
 }
 
 export async function requireSession(): Promise<SessionUser> {
