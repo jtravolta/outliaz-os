@@ -50,3 +50,21 @@ Complete.
 ### Fix commit
 
 `060fa109ec2226784e4d9138bcc0c5e8f030013a` — `fix: harden Supabase magic-link failure cleanup`
+
+## Round 2 Fix Report
+
+### Fix
+
+- Made missing-code callback SSR client construction best-effort; construction failures now still return the generic `/login?error=access_denied` redirect.
+- Cleanup remains best-effort on this path, including when client construction or sign-out throws.
+
+### Tests/output
+
+- Added a regression test that removes Supabase configuration so `createServerSupabaseClient()` throws, and asserts the access-denied redirect.
+- `npm run test:unit` — **24 passed, 0 failed**.
+- `npm run typecheck` — **passed**.
+- `git diff --check` — **passed**.
+
+### Fix commit
+
+`1170744b8299a1611dc2037748d0d4aa3ff6a606` — `fix: preserve callback denial on client construction failure`
