@@ -10,6 +10,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -26,8 +27,8 @@ export default function Login() {
       setError(data?.error?.message ?? "Sign-in failed");
       return;
     }
-    toast("success", { description: "Signed in" });
-    window.location.href = "/dashboard";
+    setSent(true);
+    toast("success", { description: "Check your email for a sign-in link" });
   };
 
   return (
@@ -52,8 +53,9 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
           />
           {error && <p className="mb-3 text-[12px] text-destructive">{error}</p>}
+          {sent && <p className="mb-3 text-[12px] text-muted-foreground">Check your email for a sign-in link.</p>}
           <Button type="submit" disabled={busy} className="w-full">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : "Continue"}
+            {busy ? <Loader2 className="size-4 animate-spin" /> : sent ? "Resend link" : "Continue"}
           </Button>
           <p className="mt-4 text-[11.5px] text-muted-foreground">
             Demo mode — use <code className="rounded bg-muted px-1">sam@acmestudio.co</code>,{" "}
