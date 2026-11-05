@@ -178,7 +178,9 @@ const hydrate = async (
     closed_reason: r.closedReason,
     gate_override_reason: r.gateOverrideReason,
     owner_user_id: r.ownerUserId,
-    source_label: r.sourceLabel,
+    source_label: String(
+      (r.customFields as Record<string, unknown> | null)?.sourceLabel ?? "",
+    ),
     source_id: r.sourceId,
     source_run_id: r.sourceRunId,
     is_duplicate_candidate: r.isDuplicateCandidate,
@@ -572,9 +574,11 @@ export async function createProspect(
       followUpDate: input.follow_up_date || null,
       sourceId: input.source_id || null,
       sourceRunId: input.source_run_id || null,
-      sourceLabel: input.source_label || "manual",
       ownerUserId: input.owner_user_id || ctx.user.userId,
-      customFields: input.custom_fields ?? {},
+      customFields: {
+        ...(input.custom_fields ?? {}),
+        sourceLabel: input.source_label || "manual",
+      },
       stage: input.priority === "DISQUALIFIED" ? "DISQUALIFIED" : "NEW",
     })
     .returning();

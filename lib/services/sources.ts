@@ -124,7 +124,6 @@ export async function startRun(ctx: Ctx, sourceId: string, opts: { test?: boolea
       workspaceId: ctx.user.workspaceId,
       sourceId,
       status: "QUEUED",
-      isTest: !!opts.test,
       input: { ...source.inputDefaults, ...(opts.test ? { maxItems: 5 } : {}) },
     })
     .returning();
@@ -254,7 +253,6 @@ export async function processApifyImport(payload: { runId: string }) {
       itemsInvalid: result.invalid,
       itemsQualified: result.qualified,
       itemsDisqualified: result.imported - result.qualified,
-      skipped: result.skipped.slice(0, 100),
       sampleItems: collected.slice(0, 5),
     })
     .where(eq(sourceRuns.id, run.id));
@@ -263,7 +261,8 @@ export async function processApifyImport(payload: { runId: string }) {
 export async function listRuns(ctx: Ctx) {
   return db
     .select({
-      id: sourceRuns.id, status: sourceRuns.status, isTest: sourceRuns.isTest,
+      id: sourceRuns.id, status: sourceRuns.status,
+      isTest: sql<boolean>`coalesce((${sourceRuns.input}->>'test')::boolean, false)`,
       createdAt: sourceRuns.createdAt, finishedAt: sourceRuns.finishedAt,
       itemsFetched: sourceRuns.itemsFetched, itemsImported: sourceRuns.itemsImported,
       itemsDuplicate: sourceRuns.itemsDuplicate, itemsInvalid: sourceRuns.itemsInvalid,

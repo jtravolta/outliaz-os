@@ -56,7 +56,7 @@ export async function getWorkspace(
     trackOpens: row.track_opens,
     trackClicks: row.track_clicks,
     unsubscribeFooter: Boolean(row.unsubscribe_footer),
-    footerText: row.unsubscribe_footer,
+    footerText: "",
     setupCompletedAt: row.setup_completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -78,7 +78,6 @@ export async function updateWorkspace(
     "trackOpens",
     "trackClicks",
     "unsubscribeFooter",
-    "footerText",
   ];
   const values: Record<string, unknown> = { updatedAt: new Date() };
   for (const key of allowed) {
@@ -337,7 +336,12 @@ export async function getTaxonomy(ctx: Ctx) {
         usage: sql<number>`(select count(*)::int from prospects p where p.business_type_id = ${businessTypes.id})`,
       })
       .from(businessTypes)
-      .where(sql`${businessTypes.archivedAt} is null`)
+      .where(
+        and(
+          eq(businessTypes.workspaceId, ws),
+          sql`${businessTypes.archivedAt} is null`,
+        ),
+      )
       .orderBy(businessTypes.label),
     db
       .select({
@@ -390,6 +394,7 @@ export async function createBusinessType(
   const [row] = await db
     .insert(businessTypes)
     .values({
+      workspaceId: ctx.user.workspaceId,
       industrySlug: input.industrySlug,
       label: input.label.trim().slice(0, 100),
       slug: slugify(input.label).slice(0, 100),

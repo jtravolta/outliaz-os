@@ -1,7 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
-import { exportJobs, importBatches } from "@/lib/db/schema";
+import {
+  importBatches,
+  importRows as importRowTable,
+  jobs,
+} from "@/lib/db/schema";
 import type { Ctx } from "./common";
 import { audit, fail } from "./common";
 import { importRows, type ImportOptions } from "./import";
@@ -23,12 +27,23 @@ export async function createImportBatch(
       kind: "CSV",
       fileName: input.fileName?.slice(0, 255),
       mapping: input.mapping,
-      rows: input.rows,
       status: "RUNNING",
       rowsTotal: input.rows.length,
       createdBy: ctx.user.userId,
     })
     .returning();
+
+  if (input.rows.length) {
+    await db.insert(importRowTable).values(
+      input.rows.map((rawData, index) => ({
+        workspaceId: ctx.user.workspaceId,
+        batchId: batch.id,
+        rowNumber: index + 1,
+        rawData,
+      })),
+    );
+  }
+
   await audit(ctx, "import.create", "import_batch", batch.id, { rows: input.rows.length });
   return batch;
 }
@@ -48,7 +63,12 @@ export async function processBatchImport(payload: { batchId: string }) {
     },
   } as Ctx;
 
-  const rows = (batch.rows ?? []) as Record<string, unknown>[];
+  const stored = await db
+    .select({ rawData: importRowTable.rawData })
+    .from(importRowTable)
+    .where(eq(importRowTable.batchId, batch.id))
+    .orderBy(importRowTable.rowNumber);
+  const rows = stored.map((entry) => entry.rawData as Record<string, unknown>);
   const options: ImportOptions = {
     sourceLabel: `CSV · ${batch.fileName ?? "upload"}`,
   };
@@ -71,7 +91,7 @@ export async function processBatchImport(payload: { batchId: string }) {
     await db
       .update(importBatches)
       .set({
-        processed: Math.min(i + chunkSize, rows.length),
+        rowsProcessed: Math.min(i + chunkSize, rows.length),
         rowsImported: imported,
         rowsInvalid: invalid,
         rowsDuplicate: duplicate,
@@ -85,7 +105,7 @@ export async function processBatchImport(payload: { batchId: string }) {
     .update(importBatches)
     .set({
       status: "DONE",
-      processed: rows.length,
+      rowsProcessed: rows.length,
       rowsImported: imported,
       rowsInvalid: invalid,
       rowsDuplicate: duplicate,
@@ -96,10 +116,14 @@ export async function processBatchImport(payload: { batchId: string }) {
 }
 
 export async function exportProspects(payload: { exportId: string }) {
-  const [row] = await db.select().from(exportJobs).where(eq(exportJobs.id, payload.exportId));
+  const [row] = await db
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.id, payload.exportId), eq(jobs.type, "EXPORT")));
   if (!row) return;
 
-  const filters = (row.filters ?? {}) as ProspectFilters;
+  const jobPayload = (row.payload ?? {}) as Record<string, unknown>;
+  const filters = (jobPayload.filters ?? {}) as ProspectFilters;
   const all: Record<string, unknown>[] = [];
   let page = 1;
   // Bounded: 50k rows max per the plan.
@@ -142,9 +166,13 @@ export async function exportProspects(payload: { exportId: string }) {
   }
 
   await db
-    .update(exportJobs)
-    .set({ status: "DONE", csv: toCsv(all), rowCount: all.length })
-    .where(eq(exportJobs.id, row.id));
+    .update(jobs)
+    .set({
+      status: "DONE",
+      updatedAt: new Date(),
+      payload: { ...jobPayload, csv: toCsv(all), rowCount: all.length },
+    })
+    .where(eq(jobs.id, row.id));
   await audit(
     { user: { userId: "", workspaceId: row.workspaceId, email: "", name: "Export", role: "ADMIN", workspaceName: "" } },
     "prospect.export",

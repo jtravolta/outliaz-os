@@ -21,7 +21,6 @@ export async function listOffers(ctx: Ctx) {
       priceText: offers.priceText,
       constraints: offers.constraints,
       isActive: offers.isActive,
-      archivedAt: offers.archivedAt,
       services: sql<string[]>`coalesce((select array_agg(os.service::text) from offer_services os where os.offer_id = ${offers.id}), '{}')`,
       templateCount: sql<number>`(select count(*)::int from email_templates t where t.offer_id = ${offers.id})`,
     })

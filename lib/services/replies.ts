@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 
 import { db } from "@/lib/db/client";
 import {
-  enrollments, messages, notifications, prospectEvents, prospects, replies, suppressions, users,
+  enrollments, messages, prospectEvents, prospects, replies, suppressions, users,
 } from "@/lib/db/schema";
 import { providers } from "@/lib/providers";
 import type { Ctx } from "./common";
@@ -138,19 +138,6 @@ export async function handleInbound(workspaceId: string, msg: InboundMessage, as
     prospectId: prospect.id,
     type: isUnsub ? "unsubscribed" : "replied",
     payload: { subject: msg.subject, snippet: row.snippet },
-  });
-
-  const owner = prospect.ownerUserId
-    ? (await db.select({ id: users.id }).from(users).where(eq(users.id, prospect.ownerUserId)))[0]
-    : null;
-
-  await db.insert(notifications).values({
-    workspaceId,
-    userId: owner?.id ?? null,
-    kind: "reply",
-    title: `Reply from ${prospect.businessName}`,
-    body: row.snippet ?? "",
-    href: `/inbox?reply=${row.id}`,
   });
 
   await audit(

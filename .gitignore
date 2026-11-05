@@ -17,6 +17,7 @@ next-env.d.ts
 .worktrees/
 .superpowers/
 .taste-skill/
+.tmp-tools/
 
 # Private data, backups and test artifacts
 backups/

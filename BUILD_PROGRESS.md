@@ -25,6 +25,13 @@
 - Read all five supplied handoff files and their working dist/index.html; incorporated their UI/interaction requirements and documented conflicts with canonical rules.
 - Retained the handoff source unchanged at `/home/swiss/Desktop/outliaz-os-handoff`.
 
+- Reconciled the legacy Drizzle layer with the authoritative 37-table schema without changing hosted data. Removed reads/writes for dropped objects (`notifications`, `export_jobs`, `prospects.source_label`, `offers.archived_at`, `import_batches.rows/processed`, `workspaces.footer_text`, `source_runs.is_test/skipped`), restructured `industries` onto the `(workspace_id, industry_slug)` key, added `workspace_id` to `business_types`, and introduced `import_rows`.
+- Notifications: the shell and dashboard now render the documented empty feed (`lib/services/shell-notifications.ts`); `notify()` is an explicit no-op and reply notifications were removed.
+- Exports now live on `jobs` (`type = EXPORT`, CSV and row count stored in `payload`); CSV imports persist rows in `import_rows` and report `rowsProcessed`.
+- Source provenance now lives in `custom_fields.sourceLabel`; reports group by joined `lead_sources.name` with a `'Manual'` fallback; the sending footer is generated from `workspaces.name`.
+- Hosted workspace `Outliaz` (id `3b11d25e-3fde-40b3-a157-0a0aa62093ef`) and owner `bubblejunkie97@gmail.com` were bootstrapped earlier with approval; 17 industries and 62 business types seeded; still 0 prospects and sending remains disabled.
+- Added regression tests for the empty notification feed (shell service and dashboard service). `test:unit` now runs with `--test-concurrency=1` because the suite shares one local database.
+
 ## Next
 
 - Convert service modules from Drizzle to Prisma incrementally behind the existing service/API boundaries, starting with a read-only surface and preserving workspace scoping.
@@ -44,6 +51,8 @@
 - Shared UI slice is authorized; later functional slices still require their planned scope gates. No real database migration/import, external email, paid scraping or public deployment authorized by this UI request.
 
 ## Verification evidence
+
+- Schema-compatibility slice on 2026-11-05: `npm run test:unit` (7/7), `npm run typecheck`, `npm run ui:build`, Prettier and `git diff --check` passed. Production server (port 3002) served the real owner with zero server errors; `/dashboard`, `/prospects`, `/settings`, `/library`, `/inbox`, `/reports`, `/outreach`, `/runs`, `/sequences`, `/sources` all loaded without an application error.
 
 - Supabase baseline verification on 2026-11-05: handoff `verify_schema.sql` passed and rolled back; 37/37 public application tables have RLS, browser roles have zero table grants, hosted workspace/user/prospect counts remain zero, `prisma migrate diff` reports no difference, and `prisma migrate status` reports up to date.
 - Authoritative-schema application verification: `npm run test:unit` (4/4 local-only database tests), `npm run typecheck`, `npm run ui:build`, and the synthetic shell Playwright suite (8/8) passed. The six authenticated workflow E2E tests are intentionally deferred until the first hosted owner is explicitly bootstrapped.

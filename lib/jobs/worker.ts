@@ -1,7 +1,7 @@
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
-import { exportJobs, importBatches, leadSources, sourceRuns } from "@/lib/db/schema";
+import { importBatches, leadSources, sourceRuns } from "@/lib/db/schema";
 import { claimJobs, completeJob, enqueue, failJob, type JobRecord } from "./queue";
 import { processApifyImport, processApifyPoll, processApifyStart } from "@/lib/services/sources";
 import { processSendStep } from "@/lib/services/sending";
@@ -25,7 +25,7 @@ export async function runJob(job: JobRecord): Promise<void> {
     case "IMAP_SYNC":
       return syncImapForWorkspace(job.workspaceId);
     case "EXPORT":
-      return exportProspects(payload as { exportId: string });
+      return exportProspects({ exportId: job.id });
     case "SCHEDULE_SOURCE":
       return scheduleSources(job.workspaceId);
     default:
@@ -115,4 +115,4 @@ export async function retryDeadJobs(workspaceId: string) {
   `);
 }
 
-export { enqueue, importBatches, exportJobs };
+export { enqueue, importBatches };

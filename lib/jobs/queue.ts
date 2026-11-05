@@ -58,6 +58,7 @@ export async function claimJobs(limit = 20, workerId = `local-${process.pid}`): 
     lastError: (r.last_error as string) ?? null,
     dedupeKey: (r.dedupe_key as string) ?? null,
     createdAt: r.created_at ? new Date(String(r.created_at)) : new Date(),
+    updatedAt: r.updated_at ? new Date(String(r.updated_at)) : new Date(),
   });
 
   return rows.map(toJob);

@@ -67,7 +67,6 @@ export const workspaces = pgTable("workspaces", {
   trackOpens: boolean("track_opens").default(true).notNull(),
   trackClicks: boolean("track_clicks").default(true).notNull(),
   unsubscribeFooter: boolean("unsubscribe_footer").default(true).notNull(),
-  footerText: text("footer_text").default("Acme Studio · 12 Marlborough Place, London · You are receiving this because we believe it may be relevant to your business."),
   setupCompletedAt: timestamp("setup_completed_at", { withTimezone: true }),
   createdAt: created(),
   updatedAt: updated(),
@@ -91,20 +90,24 @@ export const users = pgTable("users", {
 ]);
 
 export const industries = pgTable("industries", {
-  slug: varchar("slug", { length: 60 }).primaryKey(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  industrySlug: varchar("industry_slug", { length: 60 }).notNull(),
   label: varchar("label", { length: 100 }).notNull(),
-  isSystem: boolean("is_system").default(true).notNull(),
-});
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [primaryKey({ columns: [t.workspaceId, t.industrySlug] })]);
 
 export const businessTypes = pgTable("business_types", {
   id: id(),
-  industrySlug: varchar("industry_slug", { length: 60 }).notNull().references(() => industries.slug),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  industrySlug: varchar("industry_slug", { length: 60 }).notNull(),
   label: varchar("label", { length: 100 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull(),
-  isSystem: boolean("is_system").default(true).notNull(),
+  isSystem: boolean("is_system").default(false).notNull(),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: created(),
-}, (t) => [uniqueIndex("bt_industry_slug_uq").on(t.industrySlug, t.slug), index("bt_industry_idx").on(t.industrySlug)]);
+  updatedAt: updated(),
+}, (t) => [uniqueIndex("bt_industry_slug_uq").on(t.workspaceId, t.industrySlug, t.slug), index("bt_industry_idx").on(t.industrySlug)]);
 
 export const integrationCredentials = pgTable("integration_credentials", {
   id: id(),
@@ -152,9 +155,9 @@ export const sourceRuns = pgTable("source_runs", {
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   sourceId: uuid("source_id").notNull().references(() => leadSources.id, { onDelete: "cascade" }),
   apifyRunId: varchar("apify_run_id", { length: 160 }),
+  apifyDatasetId: varchar("apify_dataset_id", { length: 160 }),
   status: runStatusEnum("status").default("QUEUED").notNull(),
   input: jsonb("input").$type<Record<string, unknown>>().default({}).notNull(),
-  isTest: boolean("is_test").default(false).notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   itemsFetched: integer("items_fetched").default(0).notNull(),
@@ -163,7 +166,6 @@ export const sourceRuns = pgTable("source_runs", {
   itemsInvalid: integer("items_invalid").default(0).notNull(),
   itemsQualified: integer("items_qualified").default(0).notNull(),
   itemsDisqualified: integer("items_disqualified").default(0).notNull(),
-  skipped: jsonb("skipped").$type<{ reason: string; row?: Record<string, unknown> }[]>().default([]).notNull(),
   error: jsonb("error").$type<{ code: string; message: string } | null>(),
   sampleItems: jsonb("sample_items").$type<Record<string, unknown>[]>().default([]).notNull(),
   createdAt: created(),
@@ -179,13 +181,13 @@ export const importBatches = pgTable("import_batches", {
   kind: varchar("kind", { length: 20 }).default("CSV").notNull(),
   fileName: varchar("file_name", { length: 255 }),
   mapping: jsonb("mapping").$type<Record<string, string>>().default({}).notNull(),
-  rows: jsonb("rows").$type<Record<string, string>[]>().default([]).notNull(),
   status: importStatusEnum("status").default("PREVIEW").notNull(),
-  processed: integer("processed").default(0).notNull(),
+  rowsProcessed: integer("rows_processed").default(0).notNull(),
   rowsTotal: integer("rows_total").default(0).notNull(),
   rowsImported: integer("rows_imported").default(0).notNull(),
   rowsInvalid: integer("rows_invalid").default(0).notNull(),
   rowsDuplicate: integer("rows_duplicate").default(0).notNull(),
+  rowsSuppressed: integer("rows_suppressed").default(0).notNull(),
   errorReport: jsonb("error_report").$type<{ row: number; reason: string }[]>().default([]).notNull(),
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: created(),
@@ -214,7 +216,7 @@ export const prospects = pgTable("prospects", {
   businessName: varchar("business_name", { length: 200 }).notNull(),
   website: text("website"),
   domainNormalized: varchar("domain_normalized", { length: 255 }),
-  industrySlug: varchar("industry_slug", { length: 60 }).references(() => industries.slug),
+  industrySlug: varchar("industry_slug", { length: 60 }),
   businessTypeId: uuid("business_type_id").references(() => businessTypes.id),
   companySize: companySizeEnum("company_size").default("UNKNOWN").notNull(),
   employeeCount: integer("employee_count"),
@@ -243,7 +245,6 @@ export const prospects = pgTable("prospects", {
   qualificationRevision: integer("qualification_revision"),
   sourceId: uuid("source_id").references(() => leadSources.id, { onDelete: "set null" }),
   sourceRunId: uuid("source_run_id").references(() => sourceRuns.id, { onDelete: "set null" }),
-  sourceLabel: varchar("source_label", { length: 160 }),
   ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "set null" }),
   isDuplicateCandidate: boolean("is_duplicate_candidate").default(false).notNull(),
   customFields: jsonb("custom_fields").$type<Record<string, unknown>>().default({}).notNull(),
@@ -332,7 +333,6 @@ export const offers = pgTable("offers", {
   priceText: varchar("price_text", { length: 120 }),
   constraints: text("constraints"),
   isActive: boolean("is_active").default(true).notNull(),
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: created(),
   updatedAt: updated(),
 });
@@ -466,6 +466,7 @@ export const jobs = pgTable("jobs", {
   lastError: text("last_error"),
   dedupeKey: varchar("dedupe_key", { length: 200 }),
   createdAt: created(),
+  updatedAt: updated(),
 }, (t) => [
   uniqueIndex("jobs_dedupe_uq").on(t.dedupeKey),
   index("jobs_due_idx").on(t.status, t.runAt),
@@ -490,26 +491,17 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: created(),
 }, (t) => [index("audit_ws_idx").on(t.workspaceId, t.createdAt)]);
 
-export const notifications = pgTable("notifications", {
+export const importRows = pgTable("import_rows", {
   id: id(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-  kind: varchar("kind", { length: 40 }).notNull(),
-  title: varchar("title", { length: 200 }).notNull(),
-  body: text("body"),
-  href: text("href"),
-  readAt: timestamp("read_at", { withTimezone: true }),
+  batchId: uuid("batch_id").notNull().references(() => importBatches.id, { onDelete: "cascade" }),
+  rowNumber: integer("row_number").notNull(),
+  rawData: jsonb("raw_data").$type<Record<string, unknown>>().default({}).notNull(),
+  status: varchar("status", { length: 20 }).default("PENDING").notNull(),
+  prospectId: uuid("prospect_id").references(() => prospects.id, { onDelete: "set null" }),
+  error: jsonb("error").$type<Record<string, unknown> | null>(),
   createdAt: created(),
-}, (t) => [index("notif_ws_idx").on(t.workspaceId, t.createdAt)]);
-
-export const exportJobs = pgTable("export_jobs", {
-  id: id(),
-  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
-  filters: jsonb("filters").$type<Record<string, unknown>>().default({}).notNull(),
-  status: jobStatusEnum("status").default("PENDING").notNull(),
-  rowCount: integer("row_count").default(0).notNull(),
-  csv: text("csv"),
-  createdAt: created(),
-});
+  updatedAt: updated(),
+}, (t) => [uniqueIndex("import_rows_batch_row_uq").on(t.workspaceId, t.batchId, t.rowNumber)]);
 
 export const TAXONOMY_INDUSTRY_SLUGS = INDUSTRIES.map((i) => i[0]);

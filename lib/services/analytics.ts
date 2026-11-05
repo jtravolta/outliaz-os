@@ -2,9 +2,10 @@ import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import {
-  enrollments, leadSources, messages, notifications, prospectNotes, prospects, replies, sourceRuns,
+  enrollments, leadSources, messages, prospectNotes, prospects, replies, sourceRuns,
 } from "@/lib/db/schema";
 import type { Ctx } from "./common";
+import { listShellNotifications } from "./shell-notifications";
 import { STAGES } from "@/lib/taxonomy/enums";
 
 export async function dashboard(ctx: Ctx) {
@@ -95,15 +96,16 @@ export async function dashboard(ctx: Ctx) {
     .orderBy(desc(replies.receivedAt))
     .limit(5);
 
-  const notifs = await db
-    .select({
-      id: notifications.id, kind: notifications.kind, title: notifications.title, body: notifications.body,
-      href: notifications.href, readAt: notifications.readAt,
-    })
-    .from(notifications)
-    .where(eq(notifications.workspaceId, ws))
-    .orderBy(desc(notifications.createdAt))
-    .limit(8);
+  const dbNotifs = await listShellNotifications();
+
+  const notifs = dbNotifs.map((n) => ({
+    id: n.id,
+    kind: n.kind,
+    title: n.title,
+    body: n.body,
+    href: n.href,
+    readAt: n.readAt,
+  }));
 
   const [active] = await db
     .select({ active: sql<number>`count(*)::int` })
@@ -166,10 +168,14 @@ export async function reports(ctx: Ctx) {
     .groupBy(prospects.industrySlug);
 
   const bySource = await db
-    .select({ source: prospects.sourceLabel, count: sql<number>`count(*)::int` })
+    .select({
+      source: sql<string>`coalesce(${leadSources.name}, 'Manual')`,
+      count: sql<number>`count(*)::int`,
+    })
     .from(prospects)
+    .leftJoin(leadSources, eq(leadSources.id, prospects.sourceId))
     .where(and(eq(prospects.workspaceId, ws), isNull(prospects.deletedAt)))
-    .groupBy(prospects.sourceLabel);
+    .groupBy(sql`coalesce(${leadSources.name}, 'Manual')`);
 
   return { deliverability, pipeline: stageRows, sources, byIndustry, bySource };
 }

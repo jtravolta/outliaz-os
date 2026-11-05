@@ -13,7 +13,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 -p 3000",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --env-file=.env --test tests/unit/**/*.test.ts",
+    "test:unit": "tsx --env-file=.env --test --test-concurrency=1 tests/unit/**/*.test.ts",
     "test": "playwright test",
     "test:e2e": "playwright test",
     "fmt:check": "prettier --check components/app-shell.tsx components/nav-meta.tsx components/shell-preferences.tsx components/ui/button.tsx components/ui/sheet.tsx components/ui/tooltip.tsx app/layout.tsx app/ui-review/page.tsx app/globals.css tests/e2e/shell.spec.ts playwright.config.ts",

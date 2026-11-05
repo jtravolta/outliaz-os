@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db/client";
-import { notifications, users, workspaces } from "@/lib/db/schema";
 import { AppShell } from "@/components/app-shell";
 import { CommandPalette } from "@/components/command-palette";
-import type { NotificationItem, ShellUser } from "@/components/nav-meta";
+import type { ShellUser } from "@/components/nav-meta";
 import { getSession } from "@/lib/auth/session";
+import { listShellNotifications } from "@/lib/services/shell-notifications";
 
 export default async function AppLayout({
   children,
@@ -24,28 +22,7 @@ export default async function AppLayout({
     workspaceName: user.workspaceName,
   };
 
-  const notifs = await db
-    .select({
-      id: notifications.id,
-      kind: notifications.kind,
-      title: notifications.title,
-      body: notifications.body,
-      href: notifications.href,
-      readAt: notifications.readAt,
-    })
-    .from(notifications)
-    .where(eq(notifications.workspaceId, user.workspaceId))
-    .orderBy(notifications.createdAt)
-    .limit(8);
-
-  const items: NotificationItem[] = notifs.map((n) => ({
-    id: n.id,
-    kind: n.kind,
-    title: n.title,
-    body: n.body,
-    href: n.href,
-    readAt: n.readAt,
-  }));
+  const items = await listShellNotifications();
 
   return (
     <AppShell

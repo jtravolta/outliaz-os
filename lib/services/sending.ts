@@ -206,7 +206,9 @@ export async function processSendStep(payload: { enrollmentId: string; force?: b
   const app = appUrl();
   const pixelUrl = workspace.trackOpens ? `${app}/api/track/o/${trackToken(message.id, "o")}.gif` : undefined;
   let html = wrapEmailHtml(markdownToHtml(body), {
-    footer: workspace.unsubscribeFooter ? workspace.footerText ?? "" : "",
+    footer: workspace.unsubscribeFooter
+      ? `${workspace.name} · You are receiving this because we believe it may be relevant to your business.`
+      : "",
     unsubscribeUrl: `${app}/u/${unsubscribeToken(prospect.contactEmail!, workspace.id)}`,
     pixelUrl,
   });

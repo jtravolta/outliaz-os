@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { auditLogs, notifications, prospectEvents } from "@/lib/db/schema";
+import { auditLogs, prospectEvents } from "@/lib/db/schema";
 import type { SessionUser } from "@/lib/auth/session";
 
 export type Ctx = { user: SessionUser };
@@ -46,14 +46,15 @@ export async function event(
 }
 
 export async function notify(
-  workspaceId: string,
-  userId: string | null,
-  kind: string,
-  title: string,
-  body?: string,
-  href?: string,
+  _workspaceId: string,
+  _userId: string | null,
+  _kind: string,
+  _title: string,
+  _body?: string,
+  _href?: string,
 ) {
-  await db.insert(notifications).values({ workspaceId, userId, kind, title, body, href });
+  // The authoritative schema has no notifications table. The shell renders an
+  // empty notification feed; keep this no-op so callers do not crash.
 }
 
 /** Wrap a handler so thrown AppErrors become JSON responses. */

@@ -9,8 +9,8 @@ import { sql } from "drizzle-orm";
 import { db, sqlClient } from "../lib/db/client";
 import {
   auditLogs, businessTypes, deletedEmails, dnsCache, emailTemplates, enrollments,
-  exportJobs, importBatches, industries, integrationCredentials, jobs, leadSources,
-  messages, notifications, offerServices, offers, prospectEvents, prospectNotes,
+  importBatches, industries, integrationCredentials, jobs, leadSources,
+  messages, offerServices, offers, prospectEvents, prospectNotes,
   prospectOpportunities, prospectServices, prospectTags, prospects, qualificationRules,
   replies, sequenceSteps, sequences, sourceRuns, suppressions, tags, users, workspaces,
 } from "../lib/db/schema";
@@ -24,11 +24,11 @@ const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
 async function reset() {
   await sqlClient.unsafe(`
     truncate table
-      export_jobs, notifications, audit_logs, dns_cache, jobs, replies, messages,
+      audit_logs, dns_cache, jobs, replies, messages,
       enrollments, sequence_steps, sequences, email_templates, offer_services, offers,
       qualification_rules, suppressions, deleted_emails, prospect_events, prospect_notes,
       prospect_tags, tags, prospect_services, prospect_opportunities, prospects,
-      import_batches, source_runs, lead_sources, integration_credentials,
+      import_rows, import_batches, source_runs, lead_sources, integration_credentials,
       business_types, industries, users, workspaces
     restart identity cascade;
   `);
@@ -135,11 +135,30 @@ async function main() {
     .returning();
   const [sam, amelia, noah] = team;
 
-  await db.insert(industries).values(INDUSTRIES.map(([slug, label]) => ({ slug, label })));
+  await db
+    .insert(industries)
+    .values(
+      INDUSTRIES.map(([slug, label]) => ({
+        workspaceId: workspace.id,
+        industrySlug: slug,
+        label,
+      })),
+    );
 
-  const btRows: { industrySlug: string; label: string; slug: string }[] = [];
+  const btRows: {
+    workspaceId: string;
+    industrySlug: string;
+    label: string;
+    slug: string;
+  }[] = [];
   for (const [industry, types] of Object.entries(BUSINESS_TYPES)) {
-    for (const type of types) btRows.push({ industrySlug: industry, label: type, slug: slugify(type) });
+    for (const type of types)
+      btRows.push({
+        workspaceId: workspace.id,
+        industrySlug: industry,
+        label: type,
+        slug: slugify(type),
+      });
   }
   const businessTypeRows = await db.insert(businessTypes).values(btRows).returning();
   const btByLabel = new Map(businessTypeRows.map((b) => [`${b.industrySlug}:${b.slug}`, b.id]));
@@ -333,7 +352,6 @@ async function main() {
       itemsFetched: 412, itemsImported: 380, itemsDuplicate: 24, itemsInvalid: 8,
       itemsQualified: 96, itemsDisqualified: 284,
       sampleItems: [{ title: "Harper & Vale Dental", city: "Manchester", employees: 14 }],
-      skipped: [{ reason: "duplicate_email" }, { reason: "missing_business_name" }],
     },
     {
       workspaceId: workspace.id, sourceId: sourceRows[0].id, status: "IMPORTED",
@@ -395,9 +413,18 @@ async function main() {
         closedReason: c.reason ?? null,
         qualificationRuleId: rule.id,
         sourceId: index % 4 === 0 ? sourceRows[1].id : sourceRows[0].id,
-        sourceLabel: index % 4 === 0 ? "Apify · Instagram Benelux" : index % 5 === 0 ? "Referral" : "Apify · Google Maps UK",
         ownerUserId: owner.id,
-        customFields: index % 7 === 0 ? { linkedin: `https://linkedin.com/company/${slugify(c.name)}` } : {},
+        customFields: {
+          ...(index % 7 === 0
+            ? { linkedin: `https://linkedin.com/company/${slugify(c.name)}` }
+            : {}),
+          sourceLabel:
+            index % 4 === 0
+              ? "Apify · Instagram Benelux"
+              : index % 5 === 0
+                ? "Referral"
+                : "Apify · Google Maps UK",
+        },
         lastContactedAt: ["CONTACTED", "FOLLOW_UP", "REPLIED", "MEETING", "PROPOSAL", "WON", "LOST"].includes(c.stage) ? ago(2 + (index % 9)) : null,
         lastReplyAt: ["REPLIED", "MEETING", "PROPOSAL", "WON"].includes(c.stage) ? ago(1 + (index % 4)) : null,
         createdAt,
@@ -542,12 +569,6 @@ async function main() {
     { workspaceId: workspace.id, emailNormalized: "dave@ironbridgemotors.co.uk", reason: "HARD_BOUNCE", source: "Resend webhook", createdAt: ago(12) },
     { workspaceId: workspace.id, emailNormalized: "old@speysidemotors.co.uk", reason: "UNSUBSCRIBED", source: "unsubscribe link", createdAt: ago(30) },
     { workspaceId: workspace.id, emailNormalized: "info@kitestudio.co.uk", reason: "MANUAL", source: "manual", note: "Competitor", createdAt: ago(20) },
-  ]);
-
-  await db.insert(notifications).values([
-    { workspaceId: workspace.id, userId: sam.id, kind: "reply", title: "Reply from Blake Legal", body: "Thanks Sam — timing is good…", href: "/inbox", createdAt: ago(1) },
-    { workspaceId: workspace.id, userId: sam.id, kind: "run_failed", title: "Instagram run failed", body: "Monthly actor quota reached.", href: "/runs", createdAt: ago(12) },
-    { workspaceId: workspace.id, userId: amelia.id, kind: "follow_up", title: "3 follow-ups are overdue", body: "Clear the oldest first.", href: "/prospects?followUp=overdue", createdAt: ago(0.5) },
   ]);
 
   await db.insert(auditLogs).values([
