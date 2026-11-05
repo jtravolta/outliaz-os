@@ -52,6 +52,26 @@ test("sign-in keeps provider failures generic", async () => {
   assert.deepEqual(response, { ok: true });
 });
 
+test("sign-in invokes the Supabase OTP method with its auth receiver", async () => {
+  let receiver: unknown;
+  const auth = {
+    signInWithOtp(this: unknown) {
+      receiver = this;
+      return Promise.resolve({ error: null });
+    },
+  };
+
+  await handleSignIn(
+    request("http://localhost/api/auth/signin", {
+      method: "POST",
+      body: JSON.stringify({ email: "owner@example.test" }),
+    }),
+    { supabase: { auth } },
+  );
+
+  assert.equal(receiver, auth);
+});
+
 test("callback exchanges the code and redirects an active mapped user to dashboard", async () => {
   let exchanged = "";
   const response = await handleCallback(
@@ -83,6 +103,16 @@ test("callback denies missing code, exchange failures, unmapped users, and disab
       signOut: async () => { signedOut += 1; return { error: null }; },
     });
     assert.equal(response.headers.get("location"), "https://app.example.test/login?error=access_denied");
-    if (scenario.url.includes("code=")) assert.equal(signedOut, 1);
+    assert.equal(signedOut, 1);
   }
+});
+
+test("callback preserves the denial redirect when session cleanup throws", async () => {
+  const response = await handleCallback(request("https://app.example.test/auth/callback"), {
+    exchangeCodeForSession: async () => ({ error: null }),
+    resolveUser: async () => null,
+    signOut: async () => { throw new Error("cleanup failed"); },
+  });
+
+  assert.equal(response.headers.get("location"), "https://app.example.test/login?error=access_denied");
 });

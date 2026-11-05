@@ -7,7 +7,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/services/common";
 
 export type SignInDependencies = {
-  signInWithOtp: (args: { email: string; options: { emailRedirectTo: string } }) => Promise<{ error: unknown }>;
+  signInWithOtp?: (args: { email: string; options: { emailRedirectTo: string } }) => Promise<{ error: unknown }>;
+  supabase?: { auth: { signInWithOtp: NonNullable<SignInDependencies["signInWithOtp"]> } };
   appUrl?: string;
 };
 
@@ -17,9 +18,14 @@ export async function handleSignIn(req: Request, dependencies?: SignInDependenci
   if (!normalized) throw new AppError("VALIDATION", "Enter your email address", 400);
 
   const appUrl = (dependencies?.appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  const client = dependencies?.signInWithOtp ?? (await createServerSupabaseClient()).auth.signInWithOtp;
+  const supabase = dependencies?.supabase ??
+    (dependencies?.signInWithOtp ? undefined : await createServerSupabaseClient());
   try {
-    await client({ email: normalized, options: { emailRedirectTo: `${appUrl}/auth/callback` } });
+    if (dependencies?.signInWithOtp) {
+      await dependencies.signInWithOtp({ email: normalized, options: { emailRedirectTo: `${appUrl}/auth/callback` } });
+    } else {
+      await supabase!.auth.signInWithOtp({ email: normalized, options: { emailRedirectTo: `${appUrl}/auth/callback` } });
+    }
   } catch {
     // Keep the response indistinguishable for unknown, rate-limited, and failed addresses.
   }
@@ -38,24 +44,35 @@ function denied(request: Request) {
 
 export async function handleCallback(request: Request, dependencies?: CallbackDependencies) {
   const code = new URL(request.url).searchParams.get("code");
-  if (!code) return denied(request);
-
   const supabase = dependencies ? undefined : await createServerSupabaseClient();
   const exchangeCodeForSession = dependencies?.exchangeCodeForSession ??
     ((value: string) => supabase!.auth.exchangeCodeForSession(value));
   const resolveUser = dependencies?.resolveUser ?? (() => getSupabaseSessionUser(supabase));
   const signOut = dependencies?.signOut ?? (() => supabase!.auth.signOut());
 
+  if (!code) {
+    await safelySignOut(signOut);
+    return denied(request);
+  }
+
   try {
     const { error } = await exchangeCodeForSession(code);
     if (error || !(await resolveUser())) {
-      await signOut();
+      await safelySignOut(signOut);
       return denied(request);
     }
   } catch {
-    await signOut();
+    await safelySignOut(signOut);
     return denied(request);
   }
 
   return NextResponse.redirect(new URL("/dashboard", request.url));
+}
+
+async function safelySignOut(signOut: CallbackDependencies["signOut"]) {
+  try {
+    await signOut();
+  } catch {
+    // Cleanup must not replace the generic access-denied redirect.
+  }
 }
