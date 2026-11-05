@@ -47,10 +47,35 @@ type ApplicationUserRow = {
   workspace_id: string;
   email: string;
   name: string | null;
-  role: string;
-  status: string;
+  role: SessionUser["role"];
+  status: "ACTIVE";
   workspaces: { name: string };
 };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function isApplicationUserRow(value: unknown): value is ApplicationUserRow {
+  if (!isRecord(value)) return false;
+  const row = value;
+  const workspace = row.workspaces;
+  const isWorkspace = isRecord(workspace) && typeof workspace.name === "string";
+
+  return isUuid(row.id)
+    && isUuid(row.workspace_id)
+    && typeof row.email === "string"
+    && (row.name === null || typeof row.name === "string")
+    && (row.role === "OWNER" || row.role === "ADMIN" || row.role === "MEMBER")
+    && row.status === "ACTIVE"
+    && isWorkspace;
+}
 
 const secret = () =>
   process.env.APP_ENCRYPTION_KEY ?? "dev-only-insecure-key-please-change-me";
@@ -94,8 +119,11 @@ export function decodeSession(token?: string | null): SessionUser | null {
   }
 }
 
-export async function getSession(): Promise<SessionUser | null> {
-  return getSupabaseSessionUser();
+export async function getSession(
+  supabase?: ClaimsClient,
+  prisma?: UserLookup,
+): Promise<SessionUser | null> {
+  return getSupabaseSessionUser(supabase, prisma);
 }
 
 /** Resolve the verified Supabase identity to an active application user. */
@@ -103,42 +131,49 @@ export async function getSupabaseSessionUser(
   supabase?: ClaimsClient,
   prisma?: UserLookup,
 ): Promise<SessionUser | null> {
-  const client = supabase ?? (await createServerSupabaseClient());
-  const { data, error } = await client.auth.getClaims();
-  const userId = data?.claims && typeof data.claims.sub === "string"
-    ? data.claims.sub
-    : null;
+  try {
+    const client = supabase ?? (await createServerSupabaseClient());
+    const { data, error } = await client.auth.getClaims();
+    const userId = data?.claims && isUuid(data.claims.sub)
+      ? data.claims.sub
+      : null;
 
-  if (error || !userId) return null;
+    if (error || !userId) return null;
 
-  const db = prisma ?? getPrismaClient();
-  const row = (await db.users.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      workspace_id: true,
-      email: true,
-      name: true,
-      role: true,
-      status: true,
-      workspaces: { select: { name: true } },
-    },
-  })) as ApplicationUserRow | null;
+    const db = prisma ?? getPrismaClient();
+    const result = await db.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        workspace_id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        workspaces: { select: { name: true } },
+      },
+    });
 
-  if (!row || row.status !== "ACTIVE") return null;
+    if (!isApplicationUserRow(result)) return null;
 
-  return {
-    userId: row.id,
-    workspaceId: row.workspace_id,
-    email: row.email,
-    name: row.name ?? row.email,
-    role: row.role as SessionUser["role"],
-    workspaceName: row.workspaces.name,
-  };
+    return {
+      userId: result.id,
+      workspaceId: result.workspace_id,
+      email: result.email,
+      name: result.name ?? result.email,
+      role: result.role,
+      workspaceName: result.workspaces.name,
+    };
+  } catch {
+    return null;
+  }
 }
 
-export async function requireSession(): Promise<SessionUser> {
-  const session = await getSession();
+export async function requireSession(
+  supabase?: ClaimsClient,
+  prisma?: UserLookup,
+): Promise<SessionUser> {
+  const session = await getSession(supabase, prisma);
   if (!session) throw new Error("UNAUTHORIZED");
   return session;
 }

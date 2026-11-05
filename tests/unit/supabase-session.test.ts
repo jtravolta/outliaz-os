@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   getSupabaseSessionUser,
+  requireSession,
   type SessionUser,
 } from "../../lib/auth/session";
 
@@ -12,22 +13,34 @@ function fakeDependencies(options: {
   claims?: Claims | null;
   claimError?: Error | null;
   row?: Record<string, unknown> | null;
+  claimsError?: Error;
+  databaseError?: Error;
 }) {
-  const lookup = { users: { findUnique: async () => options.row ?? null } };
+  const lookup = {
+    users: {
+      findUnique: async () => {
+        if (options.databaseError) throw options.databaseError;
+        return options.row ?? null;
+      },
+    },
+  };
   const supabase = {
     auth: {
-      getClaims: async () => ({
-        data: options.claims ? { claims: options.claims } : null,
-        error: options.claimError ?? null,
-      }),
+      getClaims: async () => {
+        if (options.claimsError) throw options.claimsError;
+        return {
+          data: options.claims ? { claims: options.claims } : null,
+          error: options.claimError ?? null,
+        };
+      },
     },
   };
   return { lookup, supabase };
 }
 
 const activeRow = {
-  id: "auth-user-1",
-  workspace_id: "workspace-1",
+  id: "11111111-1111-4111-8111-111111111111",
+  workspace_id: "22222222-2222-4222-8222-222222222222",
   email: "owner@example.test",
   name: "Owner",
   role: "OWNER",
@@ -69,10 +82,42 @@ test("rejects absent, malformed, or unverifiable claims", async () => {
 
 test("rejects an Auth identity with no application-user mapping", async () => {
   const { lookup, supabase } = fakeDependencies({
-    claims: { sub: "unmapped-user" },
+    claims: { sub: "33333333-3333-4333-8333-333333333333" },
   });
 
   assert.equal(await getSupabaseSessionUser(supabase, lookup), null);
+});
+
+test("rejects a malformed string subject before database lookup", async () => {
+  let lookupCount = 0;
+  const { supabase } = fakeDependencies({ claims: { sub: "not-a-uuid" } });
+  const lookup = {
+    users: { findUnique: async () => { lookupCount += 1; return activeRow; } },
+  };
+
+  assert.equal(await getSupabaseSessionUser(supabase, lookup), null);
+  assert.equal(lookupCount, 0);
+});
+
+test("fails closed when Auth claims or the database resolver throws", async () => {
+  const authFailure = fakeDependencies({
+    claimsError: new Error("claims unavailable"),
+  });
+  assert.equal(await getSupabaseSessionUser(authFailure.supabase, authFailure.lookup), null);
+
+  const databaseFailure = fakeDependencies({
+    claims: { sub: activeRow.id },
+    databaseError: new Error("database unavailable"),
+  });
+  assert.equal(await getSupabaseSessionUser(databaseFailure.supabase, databaseFailure.lookup), null);
+});
+
+test("requireSession converts an unresolved session to UNAUTHORIZED", async () => {
+  const { lookup, supabase } = fakeDependencies({ claims: null });
+  await assert.rejects(
+    requireSession(supabase, lookup),
+    (error: Error) => error.message === "UNAUTHORIZED",
+  );
 });
 
 test("rejects disabled application users and uses database role/workspace values", async () => {
