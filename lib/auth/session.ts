@@ -1,9 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import { eq } from "drizzle-orm";
 
-import { db } from "@/lib/db/client";
-import { users, workspaces } from "@/lib/db/schema";
+import { createPrismaClient, getPrismaClient } from "@/lib/db/prisma";
 
 export const SESSION_COOKIE = "oos_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
@@ -27,7 +25,10 @@ function sign(payload: string) {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-export function encodeSession(user: SessionUser, exp = Date.now() + MAX_AGE * 1000) {
+export function encodeSession(
+  user: SessionUser,
+  exp = Date.now() + MAX_AGE * 1000,
+) {
   const payload = b64(JSON.stringify({ ...user, exp }));
   return `${payload}.${sign(payload)}`;
 }
@@ -67,7 +68,10 @@ export async function requireSession(): Promise<SessionUser> {
   return session;
 }
 
-export function can(role: string, action: "write" | "admin" | "owner" | "override") {
+export function can(
+  role: string,
+  action: "write" | "admin" | "owner" | "override",
+) {
   if (role === "OWNER") return true;
   if (action === "owner") return false;
   if (role === "ADMIN") return true;
@@ -79,41 +83,46 @@ export function can(role: string, action: "write" | "admin" | "owner" | "overrid
  * gets a session. In production this is where Auth.js magic-link / Google
  * would sit — the rest of the app only depends on SessionUser.
  */
-export async function signInWithEmail(email: string): Promise<SessionUser | null> {
+export async function signInWithEmail(
+  email: string,
+  prisma: ReturnType<typeof createPrismaClient> = getPrismaClient(),
+): Promise<SessionUser | null> {
   const normalized = email.trim().toLowerCase();
   const allowlist = (process.env.ALLOWED_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
-  if (allowlist.length && !allowlist.includes(normalized) && process.env.MOCK_PROVIDERS !== "true") {
+  if (
+    allowlist.length &&
+    !allowlist.includes(normalized) &&
+    process.env.MOCK_PROVIDERS !== "true"
+  ) {
     return null;
   }
 
-  const [row] = await db
-    .select({
-      userId: users.id,
-      workspaceId: users.workspaceId,
-      email: users.email,
-      name: users.name,
-      role: users.role,
-      status: users.status,
-      workspaceName: workspaces.name,
-    })
-    .from(users)
-    .innerJoin(workspaces, eq(users.workspaceId, workspaces.id))
-    .where(eq(users.email, normalized))
-    .limit(1);
+  const row = await prisma.users.findUnique({
+    where: { email: normalized },
+    select: {
+      id: true,
+      workspace_id: true,
+      email: true,
+      name: true,
+      role: true,
+      status: true,
+      workspaces: { select: { name: true } },
+    },
+  });
 
-  if (!row || row.status === "DISABLED") return null;
+  if (!row || row.status !== "ACTIVE") return null;
 
   return {
-    userId: row.userId,
-    workspaceId: row.workspaceId,
+    userId: row.id,
+    workspaceId: row.workspace_id,
     email: row.email,
-    name: row.name,
+    name: row.name ?? row.email,
     role: row.role as SessionUser["role"],
-    workspaceName: row.workspaceName,
+    workspaceName: row.workspaces.name,
   };
 }
 

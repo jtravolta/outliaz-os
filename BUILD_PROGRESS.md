@@ -14,6 +14,7 @@
 - Preserved the original local `outbound_os` database unchanged and created isolated local test databases for migration verification.
 - Migrated the first live service read to Prisma: Settings workspace lookup now uses the pooled Prisma client, preserves the existing camelCase API response, and enforces lookup by the session workspace ID. A real-database injection test proves it does not fall back to Drizzle.
 - Migrated Settings integration-list reads to Prisma with explicit workspace scoping and preserved masked-secret response fields. Added the missing `npm run db` command for restarting the existing persistent embedded PostgreSQL server without resetting or seeding it.
+- Migrated email sign-in reads from Drizzle to Prisma. Sign-in now normalizes the address, reads the active user with its workspace through the pooled/injectable Prisma client, and rejects disabled users without creating hosted data.
 - Applied the user-supplied 37-table schema and foreign-key advisor indexes to the confirmed empty Supabase project `ubbqguhsamfclxxqootm`. Verification fixtures rolled back, leaving zero workspaces/users/prospects; all 37 tables have RLS and browser roles have zero table grants.
 - Re-introspected the authoritative Supabase schema into Prisma (37 models, 22 enums), replaced the obsolete 31-table baseline, verified zero schema drift, and marked `20261104190000_baseline` as applied without re-running it. Prisma reports the hosted schema is up to date.
 - Database tests now use only local `outbound_os_supabase_test`; they cannot derive a writable target from the hosted `DIRECT_URL`. Catalog parity normalizes PostgreSQL 17/18 NOT NULL representation and nondeterministic advisor index names while still comparing tables, enums, named constraints, and index definitions.
@@ -46,6 +47,7 @@
 
 - Supabase baseline verification on 2026-11-05: handoff `verify_schema.sql` passed and rolled back; 37/37 public application tables have RLS, browser roles have zero table grants, hosted workspace/user/prospect counts remain zero, `prisma migrate diff` reports no difference, and `prisma migrate status` reports up to date.
 - Authoritative-schema application verification: `npm run test:unit` (4/4 local-only database tests), `npm run typecheck`, `npm run ui:build`, and the synthetic shell Playwright suite (8/8) passed. The six authenticated workflow E2E tests are intentionally deferred until the first hosted owner is explicitly bootstrapped.
+- Auth-read migration verification: the new test failed against the Drizzle implementation, then passed after migration; `npm run test:unit` (5/5), `npm run typecheck`, `npm run ui:build`, formatting, hosted Prisma migration status, and zero-drift checks passed.
 - UX repair verification on 2026-11-04: `npm run typecheck`, `npm run fmt:check`, `npx playwright test --workers=1` (14/14 passed), and `NEXT_DIST_DIR=.next-ui-build npm run build` all passed.
 
 - Final production verification: UI_TEST_URL=http://127.0.0.1:3002 npm test -- --workers=1 -> 8 passed (16.2s), including zero axe violations in light and dark review screens.
