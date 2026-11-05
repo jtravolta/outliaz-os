@@ -3,13 +3,27 @@ import test from "node:test";
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { updateSession } from "../../middleware";
+import { createMiddlewareCookieAdapter, updateSession } from "../../middleware";
 
 const refreshedCookie = {
   name: "sb-access-token",
   value: "refreshed",
   options: { httpOnly: true, path: "/" },
 };
+
+test("production middleware cookie adapter forwards refreshed cookies to request and response", () => {
+  const req = request("/dashboard", { existing: "old" });
+  const responses: NextResponse[] = [];
+  const adapter = createMiddlewareCookieAdapter(req, (response) => responses.push(response));
+
+  assert.deepEqual(adapter.cookies.getAll(), [{ name: "existing", value: "old" }]);
+  adapter.cookies.setAll!([refreshedCookie], { "cache-control": "private, no-store" });
+
+  assert.equal(req.cookies.get(refreshedCookie.name)?.value, refreshedCookie.value);
+  assert.equal(adapter.getResponse().cookies.get(refreshedCookie.name)?.value, refreshedCookie.value);
+  assert.equal(adapter.getResponse().headers.get("cache-control"), "private, no-store");
+  assert.equal(responses.at(-1)?.cookies.get(refreshedCookie.name)?.value, refreshedCookie.value);
+});
 
 function request(path: string, cookies: Record<string, string> = {}) {
   const url = new URL(path, "https://app.example.test");

@@ -41,26 +41,34 @@ function copyResponseState(source: NextResponse, target: NextResponse) {
   return target;
 }
 
+export function createMiddlewareCookieAdapter(
+  request: NextRequest,
+  setResponse: ResponseSetter,
+) {
+  let response = NextResponse.next({ request });
+  const cookies: CookieMethodsServer = {
+    getAll: () => request.cookies.getAll(),
+    setAll: (cookiesToSet, headers) => {
+      cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+      const replacement = NextResponse.next({ request });
+      copyResponseState(response, replacement);
+      for (const [key, value] of Object.entries(headers)) replacement.headers.set(key, value);
+      for (const { name, value, options } of cookiesToSet) replacement.cookies.set(name, value, options);
+      response = replacement;
+      setResponse(response);
+    },
+  };
+  return { cookies, getResponse: () => response };
+}
+
 function defaultClientFactory(request: NextRequest, setResponse: ResponseSetter): ClaimsClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error("Supabase configuration is required");
 
-  let response = NextResponse.next({ request });
-  const cookieAdapter: CookieMethodsServer = {
-    getAll: () => request.cookies.getAll(),
-    setAll: (cookies) => {
-      cookies.forEach(({ name, value, options }) => request.cookies.set(name, value));
-      const replacement = NextResponse.next({ request });
-      copyResponseState(response, replacement);
-      for (const { name, value, options } of cookies) replacement.cookies.set(name, value, options);
-      response = replacement;
-      setResponse(response);
-    },
-  };
-
-  setResponse(response);
-  return createServerClient(url, key, { cookies: cookieAdapter });
+  const adapter = createMiddlewareCookieAdapter(request, setResponse);
+  setResponse(adapter.getResponse());
+  return createServerClient(url, key, { cookies: adapter.cookies });
 }
 
 export async function updateSession(
@@ -70,12 +78,11 @@ export async function updateSession(
   if (isPublicPath(request.nextUrl.pathname)) return NextResponse.next();
 
   let response = NextResponse.next({ request });
-  const client = clientFactory(request, (replacement) => {
-    response = copyResponseState(response, replacement);
-  });
-
   let claims: Record<string, unknown> | null = null;
   try {
+    const client = clientFactory(request, (replacement) => {
+      response = copyResponseState(response, replacement);
+    });
     const result = await client.auth.getClaims();
     claims = result.error ? null : result.data?.claims ?? null;
   } catch {
