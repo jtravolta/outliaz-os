@@ -2,7 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { CookieMethodsServer } from "@supabase/ssr";
 
-type RequestCookieStore = CookieMethodsServer;
+type NextCookieStore = {
+  getAll: () => { name: string; value: string }[];
+  set: (name: string, value: string, options?: object) => unknown;
+};
 
 function getPublicSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -15,12 +18,25 @@ function getPublicSupabaseConfig() {
 }
 
 export async function createServerSupabaseClient(
-  requestCookies?: RequestCookieStore,
+  requestCookies?: NextCookieStore,
 ) {
   const { url, key } = getPublicSupabaseConfig();
-  const cookieStore = requestCookies ?? (await cookies());
+  const cookieStore = (requestCookies ?? (await cookies())) as NextCookieStore;
+
+  const cookieAdapter: CookieMethodsServer = {
+    getAll: () => cookieStore.getAll(),
+    setAll: (cookiesToSet) => {
+      try {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
+      } catch {
+        // Server components cannot mutate cookies; middleware and route handlers can.
+      }
+    },
+  };
 
   return createServerClient(url, key, {
-    cookies: cookieStore,
+    cookies: cookieAdapter,
   });
 }
