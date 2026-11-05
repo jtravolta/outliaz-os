@@ -29,3 +29,24 @@ Complete.
 
 - Hosted Supabase Auth configuration and identity linking were intentionally not changed.
 - Sign-in provider failures return the same generic success response by design to avoid account enumeration.
+
+## Round 1 Fix Report
+
+### Fixes
+
+- Kept production `supabase.auth.signInWithOtp(...)` invocation attached to the `auth` receiver.
+- Made missing-code callback handling construct/use the SSR client and attempt sign-out before redirecting.
+- Made all callback cleanup best-effort so cleanup exceptions cannot replace the generic access-denied redirect.
+
+### Covering tests/output
+
+- Added a receiver-binding regression test for the real Supabase-client path.
+- Added missing-code sign-out assertion.
+- Added a throwing-cleanup regression test that still expects `/login?error=access_denied`.
+- `npm run test:unit` — **23 passed, 0 failed**.
+- `npm run typecheck` — **passed**.
+- `git diff --check` — **passed**.
+
+### Fix commit
+
+`060fa109ec2226784e4d9138bcc0c5e8f030013a` — `fix: harden Supabase magic-link failure cleanup`
